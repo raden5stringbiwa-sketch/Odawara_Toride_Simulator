@@ -7,7 +7,7 @@ const N=240,O=100,S=11,H=5;
 // 追加したいときは、ここに1行足すだけでボタンと凡例も自動で増えます。
 const TYPES=[
  {name:'平地',  color:'#dfe8b8', build:true}, // 0（build:true の種類には砦を置ける）
- {name:'山',    color:'#8a7f72'}, // 1
+ {name:'山',    color:'#2d5a34'}, // 1
  {name:'浅瀬',  color:'#3aa8a0', build:true}, // 2
  {name:'拠点',  color:'#8c9096'}, // 3
  {name:'療養所',color:'#ec6fa5'}, // 4
