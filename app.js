@@ -1,6 +1,6 @@
 'use strict';
 // 座標は x,y とも 100〜339（240×240）。表示は縦1:横2のひし形（アイソメ表示）。
-// 上の頂点が最大座標(339,339)、下の頂点が(100,100)。
+// 上の頂点が最大座標(339,339)、下の頂点が(100,100)、左の頂点が(100,339)、右の頂点が(339,100)。
 const N=240,O=100,S=11,H=5;
 
 // 地形・マークの種類。配列の番号が rect() の「種類」の番号になります。
@@ -60,8 +60,9 @@ function rebuild(){
 
 function draw(){
  const W=2*N*cs,Hh=N*cs;cv.width=W;cv.height=Hh;
- // セル座標(gx,gy) → 画面: x=(gy-gx)*cs+W/2, y=Hh-(gx+gy)*cs/2
- ctx.setTransform(-cs,-cs/2,cs,-cs/2,W/2,Hh);
+ // セル座標(gx,gy) → 画面: x=(gx-gy)*cs+W/2, y=Hh-(gx+gy)*cs/2
+ // （左の頂点が y大・x小、右の頂点が x大・y小）
+ ctx.setTransform(cs,-cs/2,-cs,-cs/2,W/2,Hh);
  for(let y=0;y<N;y++)for(let x=0;x<N;x++){const i=y*N+x;
   ctx.fillStyle=cm[i]?'#86efac':TYPES[terrain[i]].color;ctx.fillRect(x,y,1.05,1.05);
   if(owner[i]>=0){ctx.fillStyle='rgba(79,124,240,.55)';ctx.fillRect(x,y,1.05,1.05)}}
@@ -79,8 +80,8 @@ function draw(){
 function cellOf(e){
  const r=cv.getBoundingClientRect();
  const px=(e.clientX-r.left)*cv.width/r.width,py=(e.clientY-r.top)*cv.height/r.height;
- const u=(px-cv.width/2)/cs,v=(cv.height-py)/(cs/2); // u=gy-gx, v=gx+gy
- return[Math.floor((v-u)/2),Math.floor((v+u)/2)];
+ const u=(px-cv.width/2)/cs,v=(cv.height-py)/(cs/2); // u=gx-gy, v=gx+gy
+ return[Math.floor((v+u)/2),Math.floor((v-u)/2)];
 }
 
 function act(gx,gy,drag){
