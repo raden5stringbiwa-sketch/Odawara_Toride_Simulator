@@ -12,18 +12,12 @@
 <p class="note">平地をクリックで砦を配置（中央1マスが砦、周囲11×11が範囲）。2つ目からは、既存の範囲と隣接する場所（薄緑）にだけ置けます。砦（範囲内）をクリックで解除。※地形はサンプルです。</p>
 </header>
 <div class="bar">
-<button data-m="fort" class="on">砦</button>
-<button data-m="mountain">山</button>
-<button data-m="lake">湖</button>
-<button data-m="castle">城</button>
-<button data-m="erase">平地に戻す</button>
+<span id="tools"></span>
 <select id="zoom"><option value="2">小</option><option value="3" selected>中</option><option value="4">大</option><option value="6">特大</option></select>
 <button id="clear">砦を全解除</button>
 <span class="stat">砦数: <span id="cnt">0</span> ／ <span id="pos">-</span></span>
 </div>
-<div class="legend">
-<span><i style="background:#dfe8b8"></i>平地</span><span><i style="background:#8a7f72"></i>山</span><span><i style="background:#5aa0d8"></i>湖</span><span><i style="background:#c0504d"></i>城</span><span><i style="background:#4f7cf0"></i>砦の範囲</span><span><i style="background:#1e3a8a"></i>砦（中央）</span><span><i style="background:#86efac"></i>置ける場所</span><span><i style="background:#16a34a"></i>ぴったり接続（11マス先）</span>
-</div>
+<div class="legend" id="legend"></div>
 <div id="wrap"><canvas id="cv"></canvas></div>
 <script src="app.js"></script>
 </body>
