@@ -23,6 +23,8 @@ const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.get
 function rect(x1,y1,x2,y2,t){for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)terrain[(y-O)*N+(x-O)]=t}
 // 拠点（5×5）。中心の座標だけ書く。
 function base(cx,cy){rect(cx-2,cy-2,cx+2,cy+2,3)}
+// 望楼（3×3）。中心の座標だけ書く。
+function tower(cx,cy){rect(cx-1,cy-1,cx+1,cy+1,5)}
 
 // ---- 地形・マークのデータ ----
 // 山（後に書いたものが上書きされるので、山を先に書く）
@@ -32,7 +34,11 @@ base(320,320);
 base(267,330);
 base(267,309);
 base(300,300);
-// 浅瀬・療養所・望楼・矢倉と、ほかの山は、座標が分かり次第ここに追加
+base(220,220);
+// 望楼（中心座標）
+tower(260,180);
+tower(180,260);
+// 浅瀬・療養所・矢倉と、ほかの山は、座標が分かり次第ここに追加
 // ----------------------------
 
 // 積分画像（範囲内の合計をO(1)で求める）
