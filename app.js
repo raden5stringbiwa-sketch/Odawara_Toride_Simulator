@@ -46,7 +46,12 @@ function rebuild(){
   const own=new Uint8Array(N*N),bd=new Uint8Array(N*N);
   for(let i=0;i<N*N;i++)own[i]=owner[i]>=0?1:0;
   for(let y=0;y<N;y++)for(let x=0;x<N;x++){const i=y*N+x;
-   if(!own[i]&&((x>0&&own[i-1])||(x<N-1&&own[i+1])||(y>0&&own[i-N])||(y<N-1&&own[i+N])))bd[i]=1}
+   if(own[i])continue;
+   // 斜め（角）で接する場合も隣接とみなす（8方向）
+   let t=false;
+   for(let dy=-1;dy<=1&&!t;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy;
+    if((dx||dy)&&xx>=0&&yy>=0&&xx<N&&yy<N&&own[yy*N+xx]){t=true;break}}
+   if(t)bd[i]=1}
   const Io=ii(own),Ib=ii(bd);
   for(let y=0;y<N;y++)for(let x=0;x<N;x++){const i=y*N+x;
    if(!TYPES[terrain[i]].build||own[i])continue;
