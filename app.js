@@ -23,12 +23,34 @@ const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.get
 function rect(x1,y1,x2,y2,t){for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)terrain[(y-O)*N+(x-O)]=t}
 // 拠点（5×5）。中心の座標だけ書く。
 function base(cx,cy){rect(cx-2,cy-2,cx+2,cy+2,3)}
+// 多角形（4隅など、頂点を順にたどる）の内側と辺を、種類tで塗る。
+function poly(pts,t){
+ const put=(x,y)=>{if(x>=O&&y>=O&&x<O+N&&y<O+N)terrain[(y-O)*N+(x-O)]=t};
+ const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+ for(let y=Math.min(...ys);y<=Math.max(...ys);y++)for(let x=Math.min(...xs);x<=Math.max(...xs);x++){
+  let inside=false;
+  for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+   const xi=pts[i][0],yi=pts[i][1],xj=pts[j][0],yj=pts[j][1];
+   if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)inside=!inside;
+  }
+  if(inside)put(x,y);
+ }
+ for(let i=0;i<pts.length;i++){
+  const ax=pts[i][0],ay=pts[i][1],bx=pts[(i+1)%pts.length][0],by=pts[(i+1)%pts.length][1];
+  const n=Math.max(Math.abs(bx-ax),Math.abs(by-ay))||1;
+  for(let k=0;k<=n;k++)put(Math.round(ax+(bx-ax)*k/n),Math.round(ay+(by-ay)*k/n));
+ }
+}
+// 浅瀬（1マス）。座標を書く。
+function shallow(x,y){rect(x,y,x,y,2)}
 // 望楼（3×3）。中心の座標だけ書く。
 function tower(cx,cy){rect(cx-1,cy-1,cx+1,cy+1,5)}
 
 // ---- 地形・マークのデータ ----
 // 山（後に書いたものが上書きされるので、山を先に書く）
 rect(265,273,269,338,1);
+// 浅瀬：縦長のエリア（概算。日曜日に測り直して修正予定）
+poly([[291,197],[295,191],[150,243],[146,246]],2);
 // 拠点（中心座標）
 base(320,320);
 base(267,330);
@@ -38,7 +60,7 @@ base(220,220);
 // 望楼（中心座標）
 tower(260,180);
 tower(180,260);
-// 浅瀬・療養所・矢倉と、ほかの山は、座標が分かり次第ここに追加
+// 療養所・矢倉と、ほかの山・浅瀬は、座標が分かり次第ここに追加
 // ----------------------------
 
 // 積分画像（範囲内の合計をO(1)で求める）
