@@ -95,7 +95,7 @@ function rebuild(){
 }
 
 function draw(){
- const W=2*N*cs,Hh=N*cs;cv.width=W;cv.height=Hh;
+ const W=Math.round(2*N*cs),Hh=Math.round(N*cs);cv.width=W;cv.height=Hh;
  // セル座標(gx,gy) → 画面: x=(gx-gy)*cs+W/2, y=Hh-(gx+gy)*cs/2
  // （左の頂点が y大・x小、右の頂点が x大・y小）
  ctx.setTransform(cs,-cs/2,-cs,-cs/2,W/2,Hh);
@@ -110,7 +110,6 @@ function draw(){
  ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=.08;ctx.beginPath();
  for(let k=0;k<=N;k+=20){ctx.moveTo(k,0);ctx.lineTo(k,N);ctx.moveTo(0,k);ctx.lineTo(N,k)}
  ctx.stroke();
- wrap.scrollLeft=(W-wrap.clientWidth)/2;
 }
 
 function cellOf(e){
@@ -141,11 +140,34 @@ const legendItems=TYPES.map(t=>[t.name,t.color]).concat([['砦の範囲','#4f7cf
 document.getElementById('legend').innerHTML=legendItems.map(([n,c])=>'<span><i style="background:'+c+'"></i>'+n+'</span>').join('');
 
 let down=false;
-cv.addEventListener('pointerdown',e=>{down=true;const[g,h]=cellOf(e);act(g,h,false)});
+let start=null;
+cv.addEventListener('pointerdown',e=>{
+ if(e.pointerType==='mouse'){down=true;const[g,h]=cellOf(e);act(g,h,false)}
+ else start={x:e.clientX,y:e.clientY}; // タッチはタップ（指が動かなかったとき）だけ反応
+});
+cv.addEventListener('pointerup',e=>{
+ if(e.pointerType!=='mouse'&&start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8){const[g,h]=cellOf(e);act(g,h,false)}
+ start=null;
+});
+cv.addEventListener('pointercancel',()=>{start=null});
 window.addEventListener('pointerup',()=>down=false);
 cv.addEventListener('pointermove',e=>{const[g,h]=cellOf(e);
  document.getElementById('pos').textContent=(g>=0&&h>=0&&g<N&&h<N)?'x'+(g+O)+' y'+(h+O):'-';
  if(down&&mode!=='fort')act(g,h,true)});
-document.getElementById('zoom').onchange=e=>{cs=+e.target.value;draw()};
+// ズーム：'fit'＝鳥の目（全体が1画面に収まる倍率）、数字＝1マスのピクセル数（虫の目は10）
+let zoomMode='3';
+function fitScale(){return Math.max(0.3,Math.min((wrap.clientWidth-2)/(2*N),(wrap.clientHeight-2)/N))}
+function setZoom(v){
+ zoomMode=v;
+ // 切替前に画面の中心にあった地点を、切替後も画面の中心に保つ
+ const fx=(wrap.scrollLeft+wrap.clientWidth/2)/cv.width,fy=(wrap.scrollTop+wrap.clientHeight/2)/cv.height;
+ cs=v==='fit'?fitScale():+v;
+ draw();
+ wrap.scrollLeft=fx*cv.width-wrap.clientWidth/2;
+ wrap.scrollTop=fy*cv.height-wrap.clientHeight/2;
+}
+document.getElementById('zoom').onchange=e=>setZoom(e.target.value);
+window.addEventListener('resize',()=>{if(zoomMode==='fit')setZoom('fit')});
 document.getElementById('clear').onclick=()=>{forts=[];rebuild();draw()};
 rebuild();draw();
+wrap.scrollLeft=(cv.width-wrap.clientWidth)/2;
