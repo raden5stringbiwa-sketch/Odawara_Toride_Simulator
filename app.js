@@ -45,6 +45,13 @@ function poly(pts,t){
 function shallow(x,y){rect(x,y,x,y,2)}
 // 望楼（3×3）。中心の座標だけ書く。
 function tower(cx,cy){rect(cx-1,cy-1,cx+1,cy+1,5)}
+// 画面上で四角く見える帯を塗る。u=x-y（画面の左右位置）、v=x+y（画面の上下位置）で範囲を指定。
+function band(u1,u2,v1,v2,t){
+ for(let gy=0;gy<N;gy++)for(let gx=0;gx<N;gx++){
+  const x=gx+O,y=gy+O,u=x-y,v=x+y;
+  if(u>=u1&&u<=u2&&v>=v1&&v<=v2)terrain[gy*N+gx]=t;
+ }
+}
 
 // ---- 地形・マークのデータ ----
 // 山（後に書いたものが上書きされるので、山を先に書く）
@@ -52,8 +59,20 @@ rect(265,273,269,338,1);
 // 浅瀬：画面の左右に1つずつある縦長のエリア（左右対称）。概算。日曜日に測り直して修正予定。
 // 右側の浅瀬の4隅（左上・右上・右下・左下）。左側は x と y を入れ替えた鏡像で作る。
 const SHALLOW_R=[[291,197],[295,191],[246,146],[243,150]];
+
+// 山の帯：浅瀬の上辺どうし・下辺どうしをつなぐ。幅は MT マス（画面で縦に MT 段）。
+// 位置は浅瀬の4隅から自動で決まるので、浅瀬の座標を直せば帯も追従する。
+const MT=8;
+const SV=SHALLOW_R.map(([x,y])=>x+y),SU=SHALLOW_R.map(([x,y])=>x-y);
+const V_TOP=Math.max(...SV),V_BOT=Math.min(...SV);
+const U_IN=Math.round(SU.reduce((a,b)=>a+b,0)/SU.length); // 浅瀬の幅の中ほどまで食い込ませて、すき間を作らない
+band(-U_IN,U_IN,V_TOP-2*MT+1,V_TOP,1);   // 上の帯
+band(-U_IN,U_IN,V_BOT,V_BOT+2*MT-1,1);   // 下の帯
+
+// 浅瀬（山の上に重ねる）
 poly(SHALLOW_R,2);
 poly(SHALLOW_R.map(([x,y])=>[y,x]),2);
+
 // 拠点（中心座標）
 base(320,320);
 base(267,330);
