@@ -53,9 +53,6 @@ function band(u1,u2,v1,v2,t){
 }
 
 // ---- 地形・マークのデータ ----
-// 山（後に書いたものが上書きされるので、山を先に書く）
-rect(265,273,269,338,1);
-rect(273,265,338,269,1); // ↑の左右対称（x と y を入れ替えた位置）
 // 浅瀬：画面の左右に1つずつある縦長のエリア（左右対称）。概算。日曜日に測り直して修正予定。
 // 左側の浅瀬の4隅（上の左・上の右・下の右・下の左）。右側は x と y を入れ替えた鏡像で作る。
 const SHALLOW_L=[[193,295],[198,289],[149,240],[143,246]];
@@ -76,13 +73,12 @@ poly(SHALLOW_L.map(([x,y])=>[y,x]),2);
 
 // ===== 座標の一覧 =====
 // 1行に「x,y,種類,マス数」。(x,y)が中心で、マス数は 5×5 のように書く。
-// マス数を空にすると1マスだけ。下の行ほど後から上書きされる。
-// 見出し行や空行は無視されるので、送ってもらった表をそのまま貼れる。
+// マス数を空にすると1マスだけ。「x1,y1～x2,y2,種類」と書くと四角い範囲（1列の線も）になる。
+// 下の行ほど後から上書きされる。見出し行・空行・#で始まる行は無視されるので、送ってもらった表をそのまま貼れる。
 const MARKS=`
 x,y,地形,マス数
 320,320,拠点,5×5
 220,220,拠点,5×5
-267,309,拠点,5×5
 260,180,望楼,3×3
 180,260,望楼,3×3
 320,210,拠点,5×5
@@ -96,12 +92,8 @@ x,y,地形,マス数
 160,210,矢倉,3×3
 230,280,療養所,3×3
 300,300,抜け道,3×3
-267,330,山城,5×5
-329,267,山城,5×5
 120,120,拠点,5×5
 140,140,抜け道,3×3
-131,172,山城,5×5
-172,130,山城,5×5
 240,200,抜け道,3×3
 200,240,抜け道,3×3
 221,261,山道,3×3
@@ -129,37 +121,67 @@ x,y,地形,マス数
 146,242,平地,
 149,239,平地,
 150,239,平地,
-# 山（左上側）
+`;
+
+// ===== 対称に置くもの =====
+// 「@左右」「@上下」「@左右上下」の行から、次の @ の行までに書いたものは、対称な位置にも自動で置かれる。
+//   左右＝x と y を入れ替えた位置（画面で左右に折り返し）／上下＝画面で上下に折り返した位置。
+//   @左右上下 なら、元と合わせて4か所。左上側の1つ分だけ書けばよい。
+// 対称の中心は (220,220)。
+const MARKS_SYM=`
+@左右上下
+# 左上の山の帯・拠点・山城・山
+265,273～269,338,山
+267,309,拠点,5×5
+267,330,山城,5×5
 229,295,山,
 230,290～230,295,山
 265,290～265,295,山
-# 山（右上側：上の3行を x と y を入れ替えて左右対称にしたもの）
-295,229,山,
-290,230～295,230,山
-290,265～295,265,山
+230,295～265,295,山
 `;
+
 (function applyMarks(){
  const byName=Object.fromEntries(TYPES.map((t,i)=>[t.name,i]));
- MARKS.split('\n').forEach(line=>{
-  // 範囲の書き方：x1,y1～x2,y2,種類（四角い範囲、1列の線もこれで書ける）
-  const r=line.match(/^\s*(\d+)\s*[,，]\s*(\d+)\s*[~～〜]\s*(\d+)\s*[,，]\s*(\d+)\s*[,，]\s*([^,，\s]+)/);
+ const RANGE=/^\s*(\d+)\s*[,，]\s*(\d+)\s*[~～〜]\s*(\d+)\s*[,，]\s*(\d+)\s*[,，]\s*([^,，\s]+)/;
+ // 1行 → 塗る四角（山道は、中心の3×3に加えて斜め両側の4×4も山道）。読めない行は null。
+ function parse(line){
+  const r=line.match(RANGE);
   if(r){
-   const t2=byName[r[5]];
-   if(t2===undefined){console.warn('未登録の種類:',line);return}
+   const t=byName[r[5]];if(t===undefined){console.warn('未登録の種類:',line);return null}
    const a=+r[1],b=+r[2],c=+r[3],d=+r[4];
-   rect(Math.min(a,c),Math.min(b,d),Math.max(a,c),Math.max(b,d),t2);
-   return;
+   return{t,rects:[[Math.min(a,c),Math.min(b,d),Math.max(a,c),Math.max(b,d)]]};
   }
   const f=line.split(/[,，]/).map(v=>v.trim());
-  if(f.length<3||!/^\d+$/.test(f[0]))return; // 見出し・空行は無視
-  const t=byName[f[2]];
-  if(t===undefined){console.warn('未登録の種類:',line);return}
+  if(f.length<3||!/^\d+$/.test(f[0]))return null; // 見出し・コメント・空行は無視
+  const t=byName[f[2]];if(t===undefined){console.warn('未登録の種類:',line);return null}
   const x=+f[0],y=+f[1],m=(f[3]||'').match(/(\d+)\s*[×xX*＊]\s*(\d+)/);
   const w=m?+m[1]:1,h=m?+m[2]:1;
   const x1=x-Math.floor((w-1)/2),y1=y-Math.floor((h-1)/2);
-  rect(x1,y1,x1+w-1,y1+h-1,t);
-  // 山道は、中心の3×3に加えて、斜め（画面の上下）両側の4×4も山道。帯を端から端まで抜ける道になる。
-  if(f[2]==='山道'&&w===3&&h===3){rect(x-4,y-4,x-1,y-1,t);rect(x+1,y+1,x+4,y+4,t)}
+  const rects=[[x1,y1,x1+w-1,y1+h-1]];
+  if(f[2]==='山道'&&w===3&&h===3)rects.push([x-4,y-4,x-1,y-1],[x+1,y+1,x+4,y+4]);
+  return{t,rects};
+ }
+ const TF={
+  id:(x,y)=>[x,y],
+  lr:(x,y)=>[y,x],              // 左右：x と y を入れ替え
+  ud:(x,y)=>[440-y,440-x],      // 上下：画面で上下に折り返し
+  both:(x,y)=>[440-x,440-y]     // 左右＋上下
+ };
+ function stamp(sh,tf){
+  sh.rects.forEach(r=>{
+   const p=TF[tf](r[0],r[1]),q=TF[tf](r[2],r[3]);
+   rect(Math.min(p[0],q[0]),Math.min(p[1],q[1]),Math.max(p[0],q[0]),Math.max(p[1],q[1]),sh.t);
+  });
+ }
+ MARKS.split('\n').forEach(line=>{const sh=parse(line);if(sh)stamp(sh,'id')});
+ let tfs=['id'];
+ MARKS_SYM.split('\n').forEach(line=>{
+  if(line.trim().startsWith('@')){
+   const lr=line.includes('左右'),ud=line.includes('上下');
+   tfs=['id'].concat(lr?['lr']:[],ud?['ud']:[],lr&&ud?['both']:[]);
+   return;
+  }
+  const sh=parse(line);if(sh)tfs.forEach(tf=>stamp(sh,tf));
  });
 })();
 // ----------------------------
