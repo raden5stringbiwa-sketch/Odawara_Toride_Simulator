@@ -55,6 +55,7 @@ function band(u1,u2,v1,v2,t){
 // ---- 地形・マークのデータ ----
 // 山（後に書いたものが上書きされるので、山を先に書く）
 rect(265,273,269,338,1);
+rect(273,265,338,269,1); // ↑の左右対称（x と y を入れ替えた位置）
 // 浅瀬：画面の左右に1つずつある縦長のエリア（左右対称）。概算。日曜日に測り直して修正予定。
 // 左側の浅瀬の4隅（上の左・上の右・下の右・下の左）。右側は x と y を入れ替えた鏡像で作る。
 const SHALLOW_L=[[193,295],[198,289],[149,240],[143,246]];
@@ -128,10 +129,27 @@ x,y,地形,マス数
 146,242,平地,
 149,239,平地,
 150,239,平地,
+# 山（左上側）
+229,295,山,
+230,290～230,295,山
+265,290～265,295,山
+# 山（右上側：上の3行を x と y を入れ替えて左右対称にしたもの）
+295,229,山,
+290,230～295,230,山
+290,265～295,265,山
 `;
 (function applyMarks(){
  const byName=Object.fromEntries(TYPES.map((t,i)=>[t.name,i]));
  MARKS.split('\n').forEach(line=>{
+  // 範囲の書き方：x1,y1～x2,y2,種類（四角い範囲、1列の線もこれで書ける）
+  const r=line.match(/^\s*(\d+)\s*[,，]\s*(\d+)\s*[~～〜]\s*(\d+)\s*[,，]\s*(\d+)\s*[,，]\s*([^,，\s]+)/);
+  if(r){
+   const t2=byName[r[5]];
+   if(t2===undefined){console.warn('未登録の種類:',line);return}
+   const a=+r[1],b=+r[2],c=+r[3],d=+r[4];
+   rect(Math.min(a,c),Math.min(b,d),Math.max(a,c),Math.max(b,d),t2);
+   return;
+  }
   const f=line.split(/[,，]/).map(v=>v.trim());
   if(f.length<3||!/^\d+$/.test(f[0]))return; // 見出し・空行は無視
   const t=byName[f[2]];
