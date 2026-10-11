@@ -9,12 +9,12 @@ const TYPES=[
  {name:'平地',  color:'#dfe8b8', build:true}, // 0（build:true の種類には砦を置ける）
  {name:'山',    color:'#2d5a34'}, // 1
  {name:'浅瀬',  color:'#3aa8a0', build:true}, // 2
- {name:'拠点',  color:'#8c9096'}, // 3
+ {name:'拠点',  color:'#8c9096'}, // 3（抜け道・山城も同じ色）
  {name:'療養所',color:'#ec6fa5'}, // 4
  {name:'望楼',  color:'#f0a43a'}, // 5
  {name:'矢倉',  color:'#8b5cd6'}, // 6
- {name:'抜け道',color:'#e3c65a'}, // 7
- {name:'山城',  color:'#b5483f'}, // 8
+ {name:'抜け道',color:'#8c9096'}, // 7
+ {name:'山城',  color:'#8c9096'}, // 8
  {name:'山道',  color:'#a8794a'}  // 9
 ];
 
@@ -56,21 +56,22 @@ function band(u1,u2,v1,v2,t){
 // 山（後に書いたものが上書きされるので、山を先に書く）
 rect(265,273,269,338,1);
 // 浅瀬：画面の左右に1つずつある縦長のエリア（左右対称）。概算。日曜日に測り直して修正予定。
-// 右側の浅瀬の4隅（左上・右上・右下・左下）。左側は x と y を入れ替えた鏡像で作る。
-const SHALLOW_R=[[291,197],[295,191],[246,146],[243,150]];
+// 左側の浅瀬の4隅（上の左・上の右・下の右・下の左）。右側は x と y を入れ替えた鏡像で作る。
+const SHALLOW_L=[[193,295],[198,289],[149,240],[143,246]];
 
-// 山の帯：浅瀬の上辺どうし・下辺どうしをつなぐ。幅は MT マス（画面で縦に MT 段）。
+// 山の帯：浅瀬の上辺どうし・下辺どうしをつなぐ。厚みは画面で縦に MT 段。
 // 位置は浅瀬の4隅から自動で決まるので、浅瀬の座標を直せば帯も追従する。
 const MT=8;
-const SV=SHALLOW_R.map(([x,y])=>x+y),SU=SHALLOW_R.map(([x,y])=>x-y);
+const BAND_V=2*MT-1; // 帯の厚み（v=x+y の幅）。山道が端から端まで抜けるよう、16でなく15にしている
+const SV=SHALLOW_L.map(([x,y])=>x+y),SU=SHALLOW_L.map(([x,y])=>Math.abs(x-y));
 const V_TOP=Math.max(...SV),V_BOT=Math.min(...SV);
 const U_IN=Math.round(SU.reduce((a,b)=>a+b,0)/SU.length); // 浅瀬の幅の中ほどまで食い込ませて、すき間を作らない
-band(-U_IN,U_IN,V_TOP-2*MT+1,V_TOP,1);   // 上の帯
-band(-U_IN,U_IN,V_BOT,V_BOT+2*MT-1,1);   // 下の帯
+band(-U_IN,U_IN,V_TOP-BAND_V+1,V_TOP,1);   // 上の帯
+band(-U_IN,U_IN,V_BOT,V_BOT+BAND_V-1,1);   // 下の帯
 
 // 浅瀬（山の上に重ねる）
-poly(SHALLOW_R,2);
-poly(SHALLOW_R.map(([x,y])=>[y,x]),2);
+poly(SHALLOW_L,2);
+poly(SHALLOW_L.map(([x,y])=>[y,x]),2);
 
 // ===== 座標の一覧 =====
 // 1行に「x,y,種類,マス数」。(x,y)が中心で、マス数は 5×5 のように書く。
@@ -93,15 +94,15 @@ x,y,地形,マス数
 120,230,拠点,5×5
 160,210,矢倉,3×3
 230,280,療養所,3×3
-300,300,抜け道,5×5
+300,300,抜け道,3×3
 267,330,山城,5×5
 329,267,山城,5×5
 120,120,拠点,5×5
-140,140,抜け道,5×5
+140,140,抜け道,3×3
 131,172,山城,5×5
 172,130,山城,5×5
-240,200,抜け道,5×5
-200,240,抜け道,5×5
+240,200,抜け道,3×3
+200,240,抜け道,3×3
 221,261,山道,3×3
 261,221,山道,3×3
 178,218,山道,3×3
@@ -139,6 +140,8 @@ x,y,地形,マス数
   const w=m?+m[1]:1,h=m?+m[2]:1;
   const x1=x-Math.floor((w-1)/2),y1=y-Math.floor((h-1)/2);
   rect(x1,y1,x1+w-1,y1+h-1,t);
+  // 山道は、中心の3×3に加えて、斜め（画面の上下）両側の4×4も山道。帯を端から端まで抜ける道になる。
+  if(f[2]==='山道'&&w===3&&h===3){rect(x-4,y-4,x-1,y-1,t);rect(x+1,y+1,x+4,y+4,t)}
  });
 })();
 // ----------------------------
@@ -213,7 +216,9 @@ function addBtn(label,m,on){const b=document.createElement('button');b.textConte
 addBtn('砦','fort',true);
 TYPES.forEach((t,i)=>{if(i)addBtn(t.name,String(i))});
 addBtn('平地に戻す','erase');
-const legendItems=TYPES.map(t=>[t.name,t.color]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['置ける場所','#86efac'],['ぴったり接続（11マス先）','#16a34a']]);
+const colorGroups=new Map();
+TYPES.forEach(t=>colorGroups.set(t.color,(colorGroups.get(t.color)||[]).concat(t.name)));
+const legendItems=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['置ける場所','#86efac'],['ぴったり接続（11マス先）','#16a34a']]);
 document.getElementById('legend').innerHTML=legendItems.map(([n,c])=>'<span><i style="background:'+c+'"></i>'+n+'</span>').join('');
 
 let down=false;
