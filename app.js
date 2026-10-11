@@ -74,6 +74,7 @@ poly(SHALLOW_L.map(([x,y])=>[y,x]),2);
 // ===== 座標の一覧 =====
 // 1行に「x,y,種類,マス数」。(x,y)が中心で、マス数は 5×5 のように書く。
 // マス数を空にすると1マスだけ。「x1,y1～x2,y2,種類」と書くと四角い範囲（1列の線も）になる。
+// 「多角形 x,y x,y x,y x,y 種類」と書くと、点を順につないだ多角形の内側を塗る（斜めの帯に使う）。
 // 下の行ほど後から上書きされる。見出し行・空行・#で始まる行は無視されるので、送ってもらった表をそのまま貼れる。
 const MARKS=`
 x,y,地形,マス数
@@ -130,14 +131,15 @@ x,y,地形,マス数
 // 対称の中心は (220,220)。
 const MARKS_SYM=`
 @左右上下
-# 左上の山の帯・拠点・山城・山
-265,273～269,338,山
+# 左上の山の帯（y289から。x265〜269・y273〜288は平地）
+265,289～269,338,山
+# 帯の左側の張り出し（塗りつぶし）と、1マスの山
+230,290～265,295,山
+229,295,山,
+# 帯の左右をつなぐ山（x=270,y289〜295 から、右側の山の帯へ。画面で横にのびる）
+多角形 270,289 270,295 295,270 289,270 山
 267,309,拠点,5×5
 267,330,山城,5×5
-229,295,山,
-230,290～230,295,山
-265,290～265,295,山
-230,295～265,295,山
 `;
 
 (function applyMarks(){
@@ -145,6 +147,12 @@ const MARKS_SYM=`
  const RANGE=/^\s*(\d+)\s*[,，]\s*(\d+)\s*[~～〜]\s*(\d+)\s*[,，]\s*(\d+)\s*[,，]\s*([^,，\s]+)/;
  // 1行 → 塗る四角（山道は、中心の3×3に加えて斜め両側の4×4も山道）。読めない行は null。
  function parse(line){
+  if(line.trim().startsWith('多角形')){
+   const pts=[...line.matchAll(/(\d+)\s*[,，]\s*(\d+)/g)].map(m=>[+m[1],+m[2]]);
+   const t=byName[line.trim().split(/[\s,，]+/).pop()];
+   if(t===undefined||pts.length<3){console.warn('多角形の書き方が違います:',line);return null}
+   return{t,poly:pts};
+  }
   const r=line.match(RANGE);
   if(r){
    const t=byName[r[5]];if(t===undefined){console.warn('未登録の種類:',line);return null}
@@ -168,6 +176,7 @@ const MARKS_SYM=`
   both:(x,y)=>[440-x,440-y]     // 左右＋上下
  };
  function stamp(sh,tf){
+  if(sh.poly){poly(sh.poly.map(([x,y])=>TF[tf](x,y)),sh.t);return}
   sh.rects.forEach(r=>{
    const p=TF[tf](r[0],r[1]),q=TF[tf](r[2],r[3]);
    rect(Math.min(p[0],q[0]),Math.min(p[1],q[1]),Math.max(p[0],q[0]),Math.max(p[1],q[1]),sh.t);
