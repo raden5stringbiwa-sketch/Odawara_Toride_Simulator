@@ -12,7 +12,10 @@ const TYPES=[
  {name:'拠点',  color:'#8c9096'}, // 3
  {name:'療養所',color:'#ec6fa5'}, // 4
  {name:'望楼',  color:'#f0a43a'}, // 5
- {name:'矢倉',  color:'#8b5cd6'}  // 6
+ {name:'矢倉',  color:'#8b5cd6'}, // 6
+ {name:'抜け道',color:'#e3c65a'}, // 7
+ {name:'山城',  color:'#b5483f'}, // 8
+ {name:'山道',  color:'#a8794a'}  // 9
 ];
 
 const terrain=new Uint8Array(N*N),owner=new Int16Array(N*N).fill(-1),cm=new Uint8Array(N*N);
@@ -20,9 +23,7 @@ let forts=[],cs=3,mode='fort',aligned=[];
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
 
 // rect(x1,y1,x2,y2,種類) … ゲームの座標のまま四角い範囲を登録。1マスなら x1=x2,y1=y2。
-function rect(x1,y1,x2,y2,t){for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)terrain[(y-O)*N+(x-O)]=t}
-// 拠点（5×5）。中心の座標だけ書く。
-function base(cx,cy){rect(cx-2,cy-2,cx+2,cy+2,3)}
+function rect(x1,y1,x2,y2,t){for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)if(x>=O&&x<O+N&&y>=O&&y<O+N)terrain[(y-O)*N+(x-O)]=t}
 // 多角形（4隅など、頂点を順にたどる）の内側と辺を、種類tで塗る。
 function poly(pts,t){
  const put=(x,y)=>{if(x>=O&&y>=O&&x<O+N&&y<O+N)terrain[(y-O)*N+(x-O)]=t};
@@ -43,8 +44,6 @@ function poly(pts,t){
 }
 // 浅瀬（1マス）。座標を書く。
 function shallow(x,y){rect(x,y,x,y,2)}
-// 望楼（3×3）。中心の座標だけ書く。
-function tower(cx,cy){rect(cx-1,cy-1,cx+1,cy+1,5)}
 // 画面上で四角く見える帯を塗る。u=x-y（画面の左右位置）、v=x+y（画面の上下位置）で範囲を指定。
 function band(u1,u2,v1,v2,t){
  for(let gy=0;gy<N;gy++)for(let gx=0;gx<N;gx++){
@@ -73,16 +72,75 @@ band(-U_IN,U_IN,V_BOT,V_BOT+2*MT-1,1);   // 下の帯
 poly(SHALLOW_R,2);
 poly(SHALLOW_R.map(([x,y])=>[y,x]),2);
 
-// 拠点（中心座標）
-base(320,320);
-base(267,330);
-base(267,309);
-base(300,300);
-base(220,220);
-// 望楼（中心座標）
-tower(260,180);
-tower(180,260);
-// 療養所・矢倉と、ほかの山・浅瀬は、座標が分かり次第ここに追加
+// ===== 座標の一覧 =====
+// 1行に「x,y,種類,マス数」。(x,y)が中心で、マス数は 5×5 のように書く。
+// マス数を空にすると1マスだけ。下の行ほど後から上書きされる。
+// 見出し行や空行は無視されるので、送ってもらった表をそのまま貼れる。
+const MARKS=`
+x,y,地形,マス数
+320,320,拠点,5×5
+220,220,拠点,5×5
+267,309,拠点,5×5
+260,180,望楼,3×3
+180,260,望楼,3×3
+320,210,拠点,5×5
+280,160,拠点,5×5
+230,120,拠点,5×5
+280,230,矢倉,3×3
+210,160,療養所,3×3
+210,320,拠点,5×5
+160,280,拠点,5×5
+120,230,拠点,5×5
+160,210,矢倉,3×3
+230,280,療養所,3×3
+300,300,抜け道,5×5
+267,330,山城,5×5
+329,267,山城,5×5
+120,120,拠点,5×5
+140,140,抜け道,5×5
+131,172,山城,5×5
+172,130,山城,5×5
+240,200,抜け道,5×5
+200,240,抜け道,5×5
+221,261,山道,3×3
+261,221,山道,3×3
+178,218,山道,3×3
+218,178,山道,3×3
+198,289,浅瀬,
+198,290,浅瀬,
+200,288,山,
+193,295,浅瀬,
+192,295,浅瀬,
+195,294,浅瀬,
+191,294,浅瀬,
+186,290,浅瀬,
+188,293,浅瀬,
+144,245,浅瀬,
+151,239,山,
+156,245,山,
+153,245,山,
+144,246,浅瀬,
+143,246,浅瀬,
+144,244,浅瀬,
+145,243,平地,
+147,241,平地,
+146,242,平地,
+149,239,平地,
+150,239,平地,
+`;
+(function applyMarks(){
+ const byName=Object.fromEntries(TYPES.map((t,i)=>[t.name,i]));
+ MARKS.split('\n').forEach(line=>{
+  const f=line.split(/[,，]/).map(v=>v.trim());
+  if(f.length<3||!/^\d+$/.test(f[0]))return; // 見出し・空行は無視
+  const t=byName[f[2]];
+  if(t===undefined){console.warn('未登録の種類:',line);return}
+  const x=+f[0],y=+f[1],m=(f[3]||'').match(/(\d+)\s*[×xX*＊]\s*(\d+)/);
+  const w=m?+m[1]:1,h=m?+m[2]:1;
+  const x1=x-Math.floor((w-1)/2),y1=y-Math.floor((h-1)/2);
+  rect(x1,y1,x1+w-1,y1+h-1,t);
+ });
+})();
 // ----------------------------
 
 // 積分画像（範囲内の合計をO(1)で求める）
