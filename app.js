@@ -21,6 +21,8 @@ const TYPES=[
 const terrain=new Uint8Array(N*N),owner=new Int16Array(N*N).fill(-1),cm=new Uint8Array(N*N);
 let forts=[],cs=3,mode='fort',aligned=[];
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
+const ov=document.getElementById('ov'),octx=ov.getContext('2d'); // 置く前の仮の砦を描く上の層（軽く動かすため別にしている）
+let ghost=null,snapT=[],snapOn=true,touchUI=false;
 
 // rect(x1,y1,x2,y2,種類) … ゲームの座標のまま四角い範囲を登録。1マスなら x1=x2,y1=y2。
 function rect(x1,y1,x2,y2,t){for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)if(x>=O&&x<O+N&&y>=O&&y<O+N)terrain[(y-O)*N+(x-O)]=t}
@@ -200,7 +202,7 @@ function ii(a){const W=N+1,I=new Int32Array(W*W);for(let y=0;y<N;y++){let r=0;fo
 function box(I,x1,y1,x2,y2){const W=N+1;return I[(y2+1)*W+x2+1]-I[y1*W+x2+1]-I[(y2+1)*W+x1]+I[y1*W+x1]}
 
 function rebuild(){
- owner.fill(-1);cm.fill(0);aligned=[];
+ owner.fill(-1);cm.fill(0);aligned=[];snapT=[];
  forts.forEach((f,i)=>{for(let y=Math.max(0,f[1]-H);y<=Math.min(N-1,f[1]+H);y++)for(let x=Math.max(0,f[0]-H);x<=Math.min(N-1,f[0]+H);x++)owner[y*N+x]=i});
  if(forts.length){
   const own=new Uint8Array(N*N),bd=new Uint8Array(N*N);
@@ -220,11 +222,14 @@ function rebuild(){
   forts.forEach(f=>[[S,0],[-S,0],[0,S],[0,-S]].forEach(([dx,dy])=>{const x=f[0]+dx,y=f[1]+dy;
    if(x>=0&&y>=0&&x<N&&y<N&&cm[y*N+x])aligned.push([x,y])}));
  }
+ // 吸着先：既存の砦から11マス先（辺で接する4か所＋角で接する4か所）のうち、置ける場所
+ forts.forEach(f=>[[S,0],[-S,0],[0,S],[0,-S],[S,S],[S,-S],[-S,S],[-S,-S]].forEach(([dx,dy])=>{
+  const x=f[0]+dx,y=f[1]+dy;if(canPlace(x,y))snapT.push([x,y])}));
  document.getElementById('cnt').textContent=forts.length;
 }
 
 function draw(){
- const W=Math.round(2*N*cs),Hh=Math.round(N*cs);cv.width=W;cv.height=Hh;
+ const W=Math.round(2*N*cs),Hh=Math.round(N*cs);cv.width=W;cv.height=Hh;ov.width=W;ov.height=Hh;
  // セル座標(gx,gy) → 画面: x=(gx-gy)*cs+W/2, y=Hh-(gx+gy)*cs/2
  // （左の頂点が y大・x小、右の頂点が x大・y小）
  ctx.setTransform(cs,-cs/2,-cs,-cs/2,W/2,Hh);
@@ -239,6 +244,7 @@ function draw(){
  ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=.08;ctx.beginPath();
  for(let k=0;k<=N;k+=20){ctx.moveTo(k,0);ctx.lineTo(k,N);ctx.moveTo(0,k);ctx.lineTo(N,k)}
  ctx.stroke();
+ drawGhost();
 }
 
 function cellOf(e){
@@ -258,10 +264,67 @@ function act(gx,gy,drag){
  rebuild();draw();
 }
 
+// ===== 仮の砦（置く前のプレビュー）=====
+function inMap(x,y){return x>=0&&y>=0&&x<N&&y<N}
+// 砦の中心として置けるか：置ける地形で、既存の範囲と重ならず、（2つ目からは）既存の範囲と隣接している
+function canPlace(x,y){
+ if(!inMap(x,y))return false;const i=y*N+x;
+ return TYPES[terrain[i]].build&&owner[i]<0&&(forts.length===0||cm[i]===1);
+}
+function reason(x,y){
+ if(!inMap(x,y))return 'マップの外です';
+ const i=y*N+x;
+ if(!TYPES[terrain[i]].build)return TYPES[terrain[i]].name+'には置けません';
+ if(owner[i]>=0)return '砦の範囲の中です';
+ for(let yy=Math.max(0,y-H);yy<=Math.min(N-1,y+H);yy++)for(let xx=Math.max(0,x-H);xx<=Math.min(N-1,x+H);xx++)
+  if(owner[yy*N+xx]>=0)return '他の砦の範囲と重なります';
+ return '砦の範囲に隣接していません';
+}
+// ぴったり接続する位置の近くなら、そこに吸い付ける（指の位置のズレを補う）
+function snap(x,y){
+ const r=Math.max(2,Math.round(16/cs));let best=null,bd=1e9;
+ for(const t of snapT){const d=Math.max(Math.abs(t[0]-x),Math.abs(t[1]-y));if(d<=r&&d<bd){bd=d;best=t}}
+ return best||[x,y];
+}
+function drawGhost(){
+ octx.setTransform(1,0,0,1,0,0);octx.clearRect(0,0,ov.width,ov.height);
+ if(!ghost||mode!=='fort')return;
+ const ok=canPlace(ghost.x,ghost.y);
+ octx.setTransform(cs,-cs/2,-cs,-cs/2,ov.width/2,ov.height);
+ octx.fillStyle=ok?'rgba(34,197,94,.30)':'rgba(220,38,38,.30)';octx.fillRect(ghost.x-H,ghost.y-H,S,S);
+ octx.strokeStyle=ok?'#15803d':'#b91c1c';octx.lineWidth=.3;octx.strokeRect(ghost.x-H,ghost.y-H,S,S);
+ octx.fillStyle=ok?'#1e3a8a':'#b91c1c';octx.fillRect(ghost.x,ghost.y,1,1);
+ octx.strokeStyle='#fff';octx.lineWidth=.15;octx.strokeRect(ghost.x,ghost.y,1,1);
+}
+const ghostbar=document.getElementById('ghostbar'),ghostinfo=document.getElementById('ghostinfo'),gplace=document.getElementById('gplace');
+function updateBar(){
+ if(!ghost||mode!=='fort'||!touchUI){ghostbar.hidden=true;return}
+ const ok=canPlace(ghost.x,ghost.y);
+ ghostinfo.textContent='x'+(ghost.x+O)+' y'+(ghost.y+O)+'　'+(ok?'置けます':reason(ghost.x,ghost.y));
+ ghostinfo.style.color=ok?'':'#c0392b';
+ gplace.disabled=!ok;
+ ghostbar.hidden=false;
+}
+function clearGhost(){ghost=null;drawGhost();updateBar()}
+function commitGhost(){
+ if(!ghost)return;
+ if(!canPlace(ghost.x,ghost.y)){updateBar();return}
+ forts.push([ghost.x,ghost.y]);ghost=null;rebuild();draw();updateBar();
+}
+// スマホのタップ：砦モードなら仮の砦を出す（砦の範囲内をタップすると解除）。ほかのモードはそのマスを塗る。
+function tapAt(gx,gy){
+ if(!inMap(gx,gy))return;
+ if(mode!=='fort'){act(gx,gy,false);return}
+ const i=gy*N+gx;
+ if(owner[i]>=0){forts.splice(owner[i],1);ghost=null;rebuild();draw();updateBar();return}
+ const sp=snapOn?snap(gx,gy):[gx,gy];
+ ghost={x:sp[0],y:sp[1]};drawGhost();updateBar();
+}
+
 // ボタンと凡例を TYPES から自動生成
 const tools=document.getElementById('tools');
 function addBtn(label,m,on){const b=document.createElement('button');b.textContent=label;b.dataset.m=m;if(on)b.className='on';
- b.onclick=()=>{mode=m;tools.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))};tools.appendChild(b)}
+ b.onclick=()=>{mode=m;clearGhost();tools.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))};tools.appendChild(b)}
 addBtn('砦','fort',true);
 TYPES.forEach((t,i)=>{if(i)addBtn(t.name,String(i))});
 addBtn('平地に戻す','erase');
@@ -270,21 +333,51 @@ TYPES.forEach(t=>colorGroups.set(t.color,(colorGroups.get(t.color)||[]).concat(t
 const legendItems=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['置ける場所','#86efac'],['ぴったり接続（11マス先）','#16a34a']]);
 document.getElementById('legend').innerHTML=legendItems.map(([n,c])=>'<span><i style="background:'+c+'"></i>'+n+'</span>').join('');
 
-let down=false;
-let start=null;
+// ===== 操作 =====
+// マウス：クリックで置く／解除（動かすと仮の砦がついてくる）。
+// スマホ：タップで仮の砦を出す → ドラッグで位置を調整 → 仮の砦をもう一度タップ（または「ここに置く」）で確定。
+//        砦以外の場所をドラッグすると、地図がスクロールする。
+let down=false,gs=null;
 cv.addEventListener('pointerdown',e=>{
- if(e.pointerType==='mouse'){down=true;const[g,h]=cellOf(e);act(g,h,false)}
- else start={x:e.clientX,y:e.clientY}; // タッチはタップ（指が動かなかったとき）だけ反応
+ const[gx,gy]=cellOf(e);
+ if(e.pointerType==='mouse'){down=true;touchUI=false;act(gx,gy,false);return}
+ cv.setPointerCapture(e.pointerId);touchUI=true;
+ gs={x0:e.clientX,y0:e.clientY,sl:wrap.scrollLeft,st:wrap.scrollTop,moved:false,
+  onGhost:!!ghost&&mode==='fort'&&Math.abs(gx-ghost.x)<=H&&Math.abs(gy-ghost.y)<=H,
+  grab:ghost?[gx-ghost.x,gy-ghost.y]:[0,0]};
+});
+cv.addEventListener('pointermove',e=>{
+ const[gx,gy]=cellOf(e);
+ if(e.pointerType==='mouse'){
+  document.getElementById('pos').textContent=inMap(gx,gy)?'x'+(gx+O)+' y'+(gy+O):'-';
+  if(down&&mode!=='fort')act(gx,gy,true);
+  else if(!down&&mode==='fort'){ghost=inMap(gx,gy)?{x:gx,y:gy}:null;drawGhost()}
+  return;
+ }
+ if(!gs)return;
+ if(!gs.moved&&Math.hypot(e.clientX-gs.x0,e.clientY-gs.y0)>8)gs.moved=true;
+ if(!gs.moved)return;
+ if(gs.onGhost){ // 仮の砦をつかんで動かす（最初につかんだ位置を保つ）
+  const t=[gx-gs.grab[0],gy-gs.grab[1]],sp=snapOn?snap(t[0],t[1]):t;
+  ghost={x:sp[0],y:sp[1]};drawGhost();updateBar();
+ }else{ // 地図をスクロール
+  wrap.scrollLeft=gs.sl-(e.clientX-gs.x0);wrap.scrollTop=gs.st-(e.clientY-gs.y0);
+ }
 });
 cv.addEventListener('pointerup',e=>{
- if(e.pointerType!=='mouse'&&start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8){const[g,h]=cellOf(e);act(g,h,false)}
- start=null;
+ down=false;
+ if(e.pointerType==='mouse'||!gs)return;
+ const t=gs;gs=null;
+ if(t.moved)return;
+ if(t.onGhost){commitGhost();return}
+ const[gx,gy]=cellOf(e);tapAt(gx,gy);
 });
-cv.addEventListener('pointercancel',()=>{start=null});
+cv.addEventListener('pointercancel',()=>{gs=null;down=false});
+cv.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'&&mode==='fort'){ghost=null;drawGhost()}});
 window.addEventListener('pointerup',()=>down=false);
-cv.addEventListener('pointermove',e=>{const[g,h]=cellOf(e);
- document.getElementById('pos').textContent=(g>=0&&h>=0&&g<N&&h<N)?'x'+(g+O)+' y'+(h+O):'-';
- if(down&&mode!=='fort')act(g,h,true)});
+gplace.onclick=commitGhost;
+document.getElementById('gcancel').onclick=clearGhost;
+document.getElementById('snap').onchange=e=>{snapOn=e.target.checked};
 // ズーム：'fit'＝鳥の目（全体が1画面に収まる倍率）、数字＝1マスのピクセル数（虫の目は10）
 let zoomMode='3';
 function fitScale(){return Math.max(0.3,Math.min((wrap.clientWidth-2)/(2*N),(wrap.clientHeight-2)/N))}
