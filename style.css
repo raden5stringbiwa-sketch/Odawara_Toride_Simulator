@@ -25,3 +25,16 @@ canvas{display:block}
 .legend{display:flex;flex-wrap:wrap;gap:10px;padding:6px 12px;font-size:12px}
 .legend i{display:inline-block;width:12px;height:12px;border:1px solid #0004;vertical-align:-2px;margin-right:4px}
 #tools{display:contents}
+[hidden]{display:none!important}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:calc(12px + env(safe-area-inset-top,0px)) 12px calc(12px + env(safe-area-inset-bottom,0px));z-index:10}
+.dlg{background:var(--card);color:var(--fg);border-radius:12px;padding:12px;max-width:min(96vw,720px);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.dlg img{max-width:100%;height:auto;border-radius:6px;border:1px solid var(--bd)}
+.dlg h2{font-size:16px;margin:0}
+.dlg h3{font-size:14px;margin:6px 0 0}
+.dlg .row{display:flex;gap:8px;flex-wrap:wrap}
+.dlg input{flex:1;min-width:0;font:inherit;padding:8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg)}
+.dlg button{font:inherit;padding:8px 12px;border:1px solid var(--bd);border-radius:6px;background:var(--card);color:var(--fg)}
+.dlg ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.dlg li{display:flex;gap:8px;align-items:center}
+.dlg li span{flex:1;word-break:break-all}
+.small{font-size:12px;opacity:.75;margin:0}

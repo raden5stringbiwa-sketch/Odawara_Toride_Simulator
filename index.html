@@ -16,6 +16,8 @@
 <select id="zoom"><option value="fit">鳥の目（全体）</option><option value="2">小</option><option value="3" selected>中</option><option value="4">大</option><option value="6">特大</option><option value="10">虫の目（拡大）</option></select>
 <label class="snap"><input type="checkbox" id="snap" checked>ぴったり吸着</label>
 <button id="clear">砦を全解除</button>
+<button id="open-saves">保存・読み込み</button>
+<button id="open-shot">投稿用画像</button>
 <span class="stat">砦数: <span id="cnt">0</span> ／ <span id="pos">-</span></span>
 </div>
 <div class="legend" id="legend"></div>
@@ -23,6 +25,22 @@
 <div id="wrap"><div id="stage"><canvas id="cv"></canvas><canvas id="ov"></canvas></div></div>
 <div id="ghostbar" hidden><span id="ghostinfo"></span><button id="gplace">ここに置く</button><button id="gcancel">やめる</button></div>
 </div>
+<div id="shot" class="overlay" hidden><div class="dlg">
+<h2>投稿用画像</h2>
+<img id="shotimg" alt="投稿用画像">
+<p class="small">スマホは画像を長押しして保存もできます。</p>
+<div class="row"><button id="shotshare">共有</button><button id="shotcopy">画像をコピー</button><button id="shotdl">保存</button><button id="shotcoords">座標をコピー</button><button id="shotclose">閉じる</button></div>
+</div></div>
+<div id="saves" class="overlay" hidden><div class="dlg">
+<h2>保存・読み込み</h2>
+<p class="small">置いた砦は、このブラウザに自動で保存されます。次に開いたとき、続きから始められます。</p>
+<div class="row"><input id="savename" placeholder="名前（例: 第1案）"><button id="savedo">保存</button></div>
+<ul id="savelist"></ul>
+<h3>コードで共有</h3>
+<div class="row"><button id="codecopy">いまの配置のコードをコピー</button></div>
+<div class="row"><input id="codein" placeholder="コードを貼り付け"><button id="codeload">読み込む</button></div>
+<div class="row"><button id="savesclose">閉じる</button></div>
+</div></div>
 <script src="app.js"></script>
 </body>
 </html>

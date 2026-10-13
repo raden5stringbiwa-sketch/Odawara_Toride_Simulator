@@ -226,24 +226,41 @@ function rebuild(){
  forts.forEach(f=>[[S,0],[-S,0],[0,S],[0,-S],[S,S],[S,-S],[-S,S],[-S,-S]].forEach(([dx,dy])=>{
   const x=f[0]+dx,y=f[1]+dy;if(canPlace(x,y))snapT.push([x,y])}));
  document.getElementById('cnt').textContent=forts.length;
+ persist();
+}
+
+// 地図を描く本体。c=描く先、W×Hh=その大きさ、k=1マスの大きさ。
+// opt.cand=置ける場所（薄緑）などの案内を描く／opt.numbers=砦に置いた順の番号を描く（投稿用画像）
+function paintMap(c,W,Hh,k,opt){
+ // セル座標(gx,gy) → 画面: x=(gx-gy)*k+W/2, y=Hh-(gx+gy)*k/2
+ // （上の頂点が(339,339)、下の頂点が(100,100)、左の頂点が x100・y339、右の頂点が x339・y100）
+ c.setTransform(k,-k/2,-k,-k/2,W/2,Hh);
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){const i=y*N+x;
+  c.fillStyle=(opt.cand&&cm[i])?'#86efac':TYPES[terrain[i]].color;c.fillRect(x,y,1.05,1.05);
+  if(owner[i]>=0){c.fillStyle='rgba(79,124,240,.55)';c.fillRect(x,y,1.05,1.05)}}
+ if(opt.cand){c.fillStyle='#16a34a';aligned.forEach(a=>c.fillRect(a[0]+.15,a[1]+.15,.7,.7))}
+ c.strokeStyle='#1e3a8a';c.lineWidth=.25;
+ forts.forEach(f=>c.strokeRect(f[0]-H,f[1]-H,S,S));
+ c.fillStyle='#1e3a8a';c.strokeStyle='#fff';c.lineWidth=.15;
+ forts.forEach(f=>{c.fillRect(f[0],f[1],1,1);c.strokeRect(f[0],f[1],1,1)});
+ c.strokeStyle='rgba(0,0,0,.18)';c.lineWidth=.08;c.beginPath();
+ for(let g=0;g<=N;g+=20){c.moveTo(g,0);c.lineTo(g,N);c.moveTo(0,g);c.lineTo(N,g)}
+ c.stroke();
+ if(opt.numbers){
+  c.setTransform(1,0,0,1,0,0);
+  const fs=Math.max(11,Math.round(k*3));
+  c.font='bold '+fs+'px sans-serif';c.textAlign='center';c.textBaseline='middle';c.lineJoin='round';
+  forts.forEach((f,n)=>{
+   const sx=(f[0]-f[1])*k+W/2,sy=Hh-(f[0]+f[1]+1)*k/2;
+   c.lineWidth=Math.max(3,fs/4);c.strokeStyle='#fff';c.strokeText(String(n+1),sx,sy);
+   c.fillStyle='#1e3a8a';c.fillText(String(n+1),sx,sy);
+  });
+ }
 }
 
 function draw(){
  const W=Math.round(2*N*cs),Hh=Math.round(N*cs);cv.width=W;cv.height=Hh;ov.width=W;ov.height=Hh;
- // セル座標(gx,gy) → 画面: x=(gx-gy)*cs+W/2, y=Hh-(gx+gy)*cs/2
- // （左の頂点が y大・x小、右の頂点が x大・y小）
- ctx.setTransform(cs,-cs/2,-cs,-cs/2,W/2,Hh);
- for(let y=0;y<N;y++)for(let x=0;x<N;x++){const i=y*N+x;
-  ctx.fillStyle=cm[i]?'#86efac':TYPES[terrain[i]].color;ctx.fillRect(x,y,1.05,1.05);
-  if(owner[i]>=0){ctx.fillStyle='rgba(79,124,240,.55)';ctx.fillRect(x,y,1.05,1.05)}}
- ctx.fillStyle='#16a34a';aligned.forEach(a=>ctx.fillRect(a[0]+.15,a[1]+.15,.7,.7));
- ctx.strokeStyle='#1e3a8a';ctx.lineWidth=.25;
- forts.forEach(f=>ctx.strokeRect(f[0]-H,f[1]-H,S,S));
- ctx.fillStyle='#1e3a8a';ctx.strokeStyle='#fff';ctx.lineWidth=.15;
- forts.forEach(f=>{ctx.fillRect(f[0],f[1],1,1);ctx.strokeRect(f[0],f[1],1,1)});
- ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=.08;ctx.beginPath();
- for(let k=0;k<=N;k+=20){ctx.moveTo(k,0);ctx.lineTo(k,N);ctx.moveTo(0,k);ctx.lineTo(N,k)}
- ctx.stroke();
+ paintMap(ctx,W,Hh,cs,{cand:true});
  drawGhost();
 }
 
@@ -392,6 +409,134 @@ function setZoom(v){
 }
 document.getElementById('zoom').onchange=e=>setZoom(e.target.value);
 window.addEventListener('resize',()=>{if(zoomMode==='fit')setZoom('fit')});
-document.getElementById('clear').onclick=()=>{forts=[];rebuild();draw()};
+document.getElementById('clear').onclick=()=>{if(forts.length&&!confirm('すべての砦を解除しますか？'))return;forts=[];ghost=null;rebuild();draw();updateBar()};
+// ===== 保存 =====
+// 置いた砦は、変えるたびにこのブラウザへ自動で保存され、次に開いたとき続きから始まる。
+// 「保存・読み込み」では名前をつけて残せる。コードをコピーすれば、同盟員に配置を渡せる。
+// 保存するのは砦の座標（ゲームの座標）だけ。地形は app.js のデータから作られる。
+const KEY_CUR='fortsim.v1.current',KEY_SAVES='fortsim.v1.saves';
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
+function fortsToGame(){return forts.map(f=>[f[0]+O,f[1]+O])}
+function setFortsFromGame(list){
+ forts=(list||[]).filter(p=>Array.isArray(p)&&p.length===2&&Number.isInteger(p[0])&&Number.isInteger(p[1])&&inMap(p[0]-O,p[1]-O)).map(p=>[p[0]-O,p[1]-O]);
+}
+function persist(){lsSet(KEY_CUR,fortsToGame())}
+function codeOf(){return 'FORT1:'+fortsToGame().map(p=>p[0]+'.'+p[1]).join(';')}
+function parseCode(text){
+ if(!/FORT1:/.test(text))return null;
+ return [...text.split('FORT1:')[1].matchAll(/(\d+)\.(\d+)/g)].map(m=>[+m[1],+m[2]]);
+}
+const pad2=n=>String(n).padStart(2,'0');
+function stampText(){const d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes())}
+function flash(btn,msg){const t=btn.textContent;btn.textContent=msg;setTimeout(()=>{btn.textContent=t},1500)}
+function loadLayout(list){
+ if(forts.length&&!confirm('いまの配置は置き換えられます。読み込みますか？'))return false;
+ setFortsFromGame(list);ghost=null;rebuild();draw();updateBar();return true;
+}
+const savesdlg=document.getElementById('saves'),savelist=document.getElementById('savelist');
+function renderSaves(){
+ const arr=lsGet(KEY_SAVES)||[];
+ savelist.textContent='';
+ if(!arr.length){const li=document.createElement('li');li.textContent='保存した配置はまだありません';savelist.appendChild(li)}
+ arr.forEach((it,idx)=>{
+  const li=document.createElement('li'),sp=document.createElement('span');
+  sp.textContent=it.name+'（'+it.forts.length+'基）';
+  const b1=document.createElement('button');b1.textContent='読み込む';
+  b1.onclick=()=>{if(loadLayout(it.forts))savesdlg.hidden=true};
+  const b2=document.createElement('button');b2.textContent='削除';
+  b2.onclick=()=>{if(!confirm('「'+it.name+'」を削除しますか？'))return;arr.splice(idx,1);lsSet(KEY_SAVES,arr);renderSaves()};
+  li.append(sp,b1,b2);savelist.appendChild(li);
+ });
+}
+document.getElementById('open-saves').onclick=()=>{renderSaves();savesdlg.hidden=false};
+document.getElementById('savesclose').onclick=()=>{savesdlg.hidden=true};
+document.getElementById('savedo').onclick=()=>{
+ const inp=document.getElementById('savename'),arr=lsGet(KEY_SAVES)||[];
+ arr.push({name:inp.value.trim()||('配置 '+stampText()),t:Date.now(),forts:fortsToGame()});
+ if(!lsSet(KEY_SAVES,arr)){alert('保存できませんでした（ブラウザの保存が使えない状態です）');return}
+ inp.value='';renderSaves();
+};
+document.getElementById('codecopy').onclick=async e=>{
+ try{await navigator.clipboard.writeText(codeOf());flash(e.target,'コピーしました')}
+ catch(err){prompt('コピーして使ってください',codeOf())}
+};
+document.getElementById('codeload').onclick=()=>{
+ const inp=document.getElementById('codein'),list=parseCode(inp.value);
+ if(!list||!list.length){alert('コードが読み取れませんでした（FORT1: から始まるコードを貼ってください）');return}
+ if(loadLayout(list)){inp.value='';savesdlg.hidden=true}
+};
+
+// ===== 投稿用画像（Discordなどに貼る用）=====
+// 地図全体＋砦（置いた順の番号つき）＋凡例の画像を作る。スマホは「共有」、パソコンは「コピー」「保存」が使える。
+const shotdlg=document.getElementById('shot'),shotimg=document.getElementById('shotimg');
+const shotshare=document.getElementById('shotshare'),shotcopy=document.getElementById('shotcopy');
+let shotBlob=null,shotUrl=null;
+function shotName(){return 'fort-'+stampText().replace(/[^0-9]/g,'')+'.png'}
+function coordText(){return '砦配置（'+forts.length+'基）\n'+forts.map((f,i)=>(i+1)+': x'+(f[0]+O)+' y'+(f[1]+O)).join('\n')}
+function makeShot(){
+ const k=4,mw=2*N*k,mh=N*k,pad=24,head=92,W=mw+pad*2;
+ const font='"Hiragino Sans","Yu Gothic",Meiryo,sans-serif';
+ const items=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a']]);
+ // 凡例を折り返して並べる
+ const m=document.createElement('canvas').getContext('2d');m.font='22px '+font;
+ const rows=[[]];let rx=0;
+ items.forEach(it=>{
+  const w=34+m.measureText(it[0]).width+22;
+  if(rx+w>W-pad*2&&rows[rows.length-1].length){rows.push([]);rx=0}
+  rows[rows.length-1].push([it,rx]);rx+=w;
+ });
+ const c=document.createElement('canvas');c.width=W;c.height=head+mh+rows.length*38+44;
+ const g=c.getContext('2d');
+ g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);
+ g.textBaseline='middle';g.textAlign='left';
+ g.fillStyle='#1f2933';g.font='bold 40px '+font;g.fillText('砦配置シミュレーション',pad,46);
+ g.fillStyle='#52606d';g.font='24px '+font;g.fillText('砦 '+forts.length+' 基　'+stampText(),pad,80);
+ const mc=document.createElement('canvas');mc.width=mw;mc.height=mh;
+ const mg=mc.getContext('2d');mg.fillStyle='#e6e8e4';mg.fillRect(0,0,mw,mh);
+ paintMap(mg,mw,mh,k,{numbers:true});
+ g.drawImage(mc,pad,head);
+ g.font='22px '+font;
+ rows.forEach((row,r)=>row.forEach(([it,x])=>{
+  const y=head+mh+28+r*38;
+  g.fillStyle=it[1];g.fillRect(pad+x,y-12,24,24);
+  g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=1;g.strokeRect(pad+x,y-12,24,24);
+  g.fillStyle='#1f2933';g.fillText(it[0],pad+x+34,y);
+ }));
+ return c;
+}
+function showShot(){
+ makeShot().toBlob(b=>{
+  if(!b){alert('画像を作れませんでした');return}
+  if(shotUrl)URL.revokeObjectURL(shotUrl);
+  shotBlob=b;shotUrl=URL.createObjectURL(b);shotimg.src=shotUrl;shotdlg.hidden=false;
+ },'image/png');
+}
+function canShareFile(){
+ try{return !!(navigator.canShare&&navigator.canShare({files:[new File(['x'],'a.png',{type:'image/png'})]}))}catch(e){return false}
+}
+shotshare.hidden=!canShareFile();
+shotcopy.hidden=!(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write);
+document.getElementById('open-shot').onclick=showShot;
+document.getElementById('shotclose').onclick=()=>{shotdlg.hidden=true};
+document.getElementById('shotdl').onclick=()=>{
+ const a=document.createElement('a');a.href=shotUrl;a.download=shotName();document.body.appendChild(a);a.click();a.remove();
+};
+shotshare.onclick=async()=>{
+ try{await navigator.share({files:[new File([shotBlob],shotName(),{type:'image/png'})],text:coordText()})}catch(e){}
+};
+shotcopy.onclick=async()=>{
+ try{await navigator.clipboard.write([new ClipboardItem({'image/png':shotBlob})]);flash(shotcopy,'コピーしました')}
+ catch(e){flash(shotcopy,'コピーできませんでした')}
+};
+document.getElementById('shotcoords').onclick=async e=>{
+ try{await navigator.clipboard.writeText(coordText());flash(e.target,'コピーしました')}
+ catch(err){flash(e.target,'コピーできませんでした')}
+};
+[shotdlg,savesdlg].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.hidden=true}));
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){shotdlg.hidden=true;savesdlg.hidden=true}});
+
+// 前回の続きから始める
+setFortsFromGame(lsGet(KEY_CUR));
 rebuild();draw();
 wrap.scrollLeft=(cv.width-wrap.clientWidth)/2;
