@@ -22,7 +22,7 @@ const terrain=new Uint8Array(N*N),owner=new Int16Array(N*N).fill(-1),cm=new Uint
 let forts=[],cs=3,mode='fort',aligned=[];
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
 const ov=document.getElementById('ov'),octx=ov.getContext('2d'); // 置く前の仮の砦を描く上の層（軽く動かすため別にしている）
-let ghost=null,snapT=[],snapOn=true,touchUI=false;
+let ghost=null,snapT=[],snapOn=true,touchUI=false,showArea=true,attack=[];
 
 // rect(x1,y1,x2,y2,種類) … ゲームの座標のまま四角い範囲を登録。1マスなら x1=x2,y1=y2。
 function rect(x1,y1,x2,y2,t){for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)if(x>=O&&x<O+N&&y>=O&&y<O+N)terrain[(y-O)*N+(x-O)]=t}
@@ -72,6 +72,14 @@ band(-U_IN,U_IN,V_BOT,V_BOT+BAND_V-1,1);   // 下の帯
 // 浅瀬（山の上に重ねる）
 poly(SHALLOW_L,2);
 poly(SHALLOW_L.map(([x,y])=>[y,x]),2);
+
+// ===== 攻撃できるエリア =====
+// 拠点・矢倉・療養所・抜け道には、まわりにエリアがあり、砦の範囲がそのエリアに隣接する（辺・角で接する、または重なる）と攻撃できる。
+// エリアは建物の中心を中心にした正方形で、値は一辺のマス数（奇数）。望楼・山城にはエリアがない。
+// 「拠点の大きさ(5×5)から3マスずつ広げた正方形」なので、いまは4種類とも11。
+// 3×3の建物は「建物の大きさから3マス広げた9×9」にしたいなら、矢倉・療養所・抜け道を 9 にする。
+const AREAS={拠点:11,矢倉:11,療養所:11,抜け道:11};
+const buildings=[]; // {name,x,y}：エリアを持つ建物（x,yはマップ上の位置。砦と同じ0始まり）
 
 // ===== 座標の一覧 =====
 // 1行に「x,y,種類,マス数」。(x,y)が中心で、マス数は 5×5 のように書く。
@@ -169,7 +177,7 @@ const MARKS_SYM=`
   const x1=x-Math.floor((w-1)/2),y1=y-Math.floor((h-1)/2);
   const rects=[[x1,y1,x1+w-1,y1+h-1]];
   if(f[2]==='山道'&&w===3&&h===3)rects.push([x-4,y-4,x-1,y-1],[x+1,y+1,x+4,y+4]);
-  return{t,rects};
+  return{t,rects,name:f[2],center:[x,y]};
  }
  const TF={
   id:(x,y)=>[x,y],
@@ -183,6 +191,10 @@ const MARKS_SYM=`
    const p=TF[tf](r[0],r[1]),q=TF[tf](r[2],r[3]);
    rect(Math.min(p[0],q[0]),Math.min(p[1],q[1]),Math.max(p[0],q[0]),Math.max(p[1],q[1]),sh.t);
   });
+  if(sh.center&&AREAS[sh.name]){ // エリアを持つ建物は、あとで攻撃判定に使うので記録しておく
+   const c=TF[tf](sh.center[0],sh.center[1]),bx=c[0]-O,by=c[1]-O;
+   if(!buildings.some(b=>b.name===sh.name&&b.x===bx&&b.y===by))buildings.push({name:sh.name,x:bx,y:by});
+  }
  }
  MARKS.split('\n').forEach(line=>{const sh=parse(line);if(sh)stamp(sh,'id')});
  let tfs=['id'];
@@ -225,8 +237,18 @@ function rebuild(){
  // 吸着先：既存の砦から11マス先（辺で接する4か所＋角で接する4か所）のうち、置ける場所
  forts.forEach(f=>[[S,0],[-S,0],[0,S],[0,-S],[S,S],[S,-S],[-S,S],[-S,-S]].forEach(([dx,dy])=>{
   const x=f[0]+dx,y=f[1]+dy;if(canPlace(x,y))snapT.push([x,y])}));
+ // 攻撃できる建物：砦の範囲(11×11)が、建物のエリアに隣接する、または重なる
+ attack=buildings.map(b=>forts.some(f=>reaches(f[0],f[1],b)));
+ document.getElementById('atk').textContent=attack.filter(Boolean).length;
+ document.getElementById('atkall').textContent=buildings.length;
  document.getElementById('cnt').textContent=forts.length;
  persist();
+}
+// 砦(x,y)の範囲が建物bのエリアに届くか。砦の範囲の半径H＋隣接の1＋エリアの半径。
+function reaches(x,y,b){return Math.max(Math.abs(x-b.x),Math.abs(y-b.y))<=H+1+(AREAS[b.name]-1)/2}
+function atkText(){
+ const by={};buildings.forEach((b,i)=>{const e=by[b.name]||(by[b.name]=[0,0]);e[1]++;if(attack[i])e[0]++});
+ return '攻撃できる建物 '+attack.filter(Boolean).length+'/'+buildings.length+'（'+Object.keys(by).map(k=>k+' '+by[k][0]+'/'+by[k][1]).join('・')+'）';
 }
 
 // 地図を描く本体。c=描く先、W×Hh=その大きさ、k=1マスの大きさ。
@@ -239,6 +261,13 @@ function paintMap(c,W,Hh,k,opt){
   c.fillStyle=(opt.cand&&cm[i])?'#86efac':TYPES[terrain[i]].color;c.fillRect(x,y,1.05,1.05);
   if(owner[i]>=0){c.fillStyle='rgba(79,124,240,.55)';c.fillRect(x,y,1.05,1.05)}}
  if(opt.cand){c.fillStyle='#16a34a';aligned.forEach(a=>c.fillRect(a[0]+.15,a[1]+.15,.7,.7))}
+ if(opt.areas){ // 建物のエリア（攻撃できるものは赤）
+  buildings.forEach((b,i)=>{
+   const sz=AREAS[b.name],h=(sz-1)/2,hit=attack[i];
+   c.fillStyle=hit?'rgba(239,68,68,.30)':'rgba(251,191,36,.22)';c.fillRect(b.x-h,b.y-h,sz,sz);
+   c.strokeStyle=hit?'#b91c1c':'#d97706';c.lineWidth=hit?.3:.2;c.strokeRect(b.x-h,b.y-h,sz,sz);
+  });
+ }
  c.strokeStyle='#1e3a8a';c.lineWidth=.25;
  forts.forEach(f=>c.strokeRect(f[0]-H,f[1]-H,S,S));
  c.fillStyle='#1e3a8a';c.strokeStyle='#fff';c.lineWidth=.15;
@@ -260,7 +289,7 @@ function paintMap(c,W,Hh,k,opt){
 
 function draw(){
  const W=Math.round(2*N*cs),Hh=Math.round(N*cs);cv.width=W;cv.height=Hh;ov.width=W;ov.height=Hh;
- paintMap(ctx,W,Hh,cs,{cand:true});
+ paintMap(ctx,W,Hh,cs,{cand:true,areas:showArea});
  drawGhost();
 }
 
@@ -317,7 +346,9 @@ const ghostbar=document.getElementById('ghostbar'),ghostinfo=document.getElement
 function updateBar(){
  if(!ghost||mode!=='fort'||!touchUI){ghostbar.hidden=true;return}
  const ok=canPlace(ghost.x,ghost.y);
- ghostinfo.textContent='x'+(ghost.x+O)+' y'+(ghost.y+O)+'　'+(ok?'置けます':reason(ghost.x,ghost.y));
+ let gain=0;
+ if(ok)buildings.forEach((b,i)=>{if(!attack[i]&&reaches(ghost.x,ghost.y,b))gain++});
+ ghostinfo.textContent='x'+(ghost.x+O)+' y'+(ghost.y+O)+'　'+(ok?'置けます（新たに攻撃できる建物 +'+gain+'）':reason(ghost.x,ghost.y));
  ghostinfo.style.color=ok?'':'#c0392b';
  gplace.disabled=!ok;
  ghostbar.hidden=false;
@@ -347,7 +378,7 @@ TYPES.forEach((t,i)=>{if(i)addBtn(t.name,String(i))});
 addBtn('平地に戻す','erase');
 const colorGroups=new Map();
 TYPES.forEach(t=>colorGroups.set(t.color,(colorGroups.get(t.color)||[]).concat(t.name)));
-const legendItems=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['置ける場所','#86efac'],['ぴったり接続（11マス先）','#16a34a']]);
+const legendItems=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['攻撃エリア','#fbbf24'],['攻撃できるエリア','#ef4444'],['置ける場所','#86efac'],['ぴったり接続（11マス先）','#16a34a']]);
 document.getElementById('legend').innerHTML=legendItems.map(([n,c])=>'<span><i style="background:'+c+'"></i>'+n+'</span>').join('');
 
 // ===== 操作 =====
@@ -395,6 +426,7 @@ window.addEventListener('pointerup',()=>down=false);
 gplace.onclick=commitGhost;
 document.getElementById('gcancel').onclick=clearGhost;
 document.getElementById('snap').onchange=e=>{snapOn=e.target.checked};
+document.getElementById('showarea').onchange=e=>{showArea=e.target.checked;draw()};
 // ズーム：'fit'＝鳥の目（全体が1画面に収まる倍率）、数字＝1マスのピクセル数（虫の目は10）
 let zoomMode='3';
 function fitScale(){return Math.max(0.3,Math.min((wrap.clientWidth-2)/(2*N),(wrap.clientHeight-2)/N))}
@@ -473,11 +505,11 @@ const shotdlg=document.getElementById('shot'),shotimg=document.getElementById('s
 const shotshare=document.getElementById('shotshare'),shotcopy=document.getElementById('shotcopy');
 let shotBlob=null,shotUrl=null;
 function shotName(){return 'fort-'+stampText().replace(/[^0-9]/g,'')+'.png'}
-function coordText(){return '砦配置（'+forts.length+'基）\n'+forts.map((f,i)=>(i+1)+': x'+(f[0]+O)+' y'+(f[1]+O)).join('\n')}
+function coordText(){return '砦配置（'+forts.length+'基）\n'+atkText()+'\n'+forts.map((f,i)=>(i+1)+': x'+(f[0]+O)+' y'+(f[1]+O)).join('\n')}
 function makeShot(){
- const k=4,mw=2*N*k,mh=N*k,pad=24,head=92,W=mw+pad*2;
+ const k=4,mw=2*N*k,mh=N*k,pad=24,head=132,W=mw+pad*2;
  const font='"Hiragino Sans","Yu Gothic",Meiryo,sans-serif';
- const items=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a']]);
+ const items=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['攻撃エリア','#fbbf24'],['攻撃できるエリア','#ef4444']]);
  // 凡例を折り返して並べる
  const m=document.createElement('canvas').getContext('2d');m.font='22px '+font;
  const rows=[[]];let rx=0;
@@ -492,9 +524,10 @@ function makeShot(){
  g.textBaseline='middle';g.textAlign='left';
  g.fillStyle='#1f2933';g.font='bold 40px '+font;g.fillText('砦配置シミュレーション',pad,46);
  g.fillStyle='#52606d';g.font='24px '+font;g.fillText('砦 '+forts.length+' 基　'+stampText(),pad,80);
+ g.fillText(atkText(),pad,114);
  const mc=document.createElement('canvas');mc.width=mw;mc.height=mh;
  const mg=mc.getContext('2d');mg.fillStyle='#e6e8e4';mg.fillRect(0,0,mw,mh);
- paintMap(mg,mw,mh,k,{numbers:true});
+ paintMap(mg,mw,mh,k,{numbers:true,areas:true});
  g.drawImage(mc,pad,head);
  g.font='22px '+font;
  rows.forEach((row,r)=>row.forEach(([it,x])=>{
