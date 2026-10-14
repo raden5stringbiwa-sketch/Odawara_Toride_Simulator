@@ -4,7 +4,7 @@
 const N=240,O=100,S=11,H=5;
 
 // 地形・マークの種類。配列の番号が rect() の「種類」の番号になります。
-// 追加したいときは、ここに1行足すだけでボタンと凡例も自動で増えます。
+// 追加したいときは、ここに1行足すだけで凡例も自動で増えます。
 const TYPES=[
  {name:'平地',  color:'#dfe8b8', build:true}, // 0（build:true の種類には砦を置ける）
  {name:'山',    color:'#2d5a34'}, // 1
@@ -83,6 +83,7 @@ const buildings=[]; // {name,x,y}：エリアを持つ建物（x,yはマップ�
 
 // ===== 座標の一覧 =====
 // 1行に「x,y,種類,マス数」。(x,y)が中心で、マス数は 5×5 のように書く。
+// 5番目に「エリアなし」と書くと、その建物には攻撃エリアを付けない（例: 240,200,抜け道,3×3,エリアなし）。
 // マス数を空にすると1マスだけ。「x1,y1～x2,y2,種類」と書くと四角い範囲（1列の線も）になる。
 // 「多角形 x,y x,y x,y x,y 種類」と書くと、点を順につないだ多角形の内側を塗る（斜めの帯に使う）。
 // 下の行ほど後から上書きされる。見出し行・空行・#で始まる行は無視されるので、送ってもらった表をそのまま貼れる。
@@ -105,8 +106,8 @@ x,y,地形,マス数
 300,300,抜け道,3×3
 120,120,拠点,5×5
 140,140,抜け道,3×3
-240,200,抜け道,3×3
-200,240,抜け道,3×3
+240,200,抜け道,3×3,エリアなし
+200,240,抜け道,3×3,エリアなし
 221,261,山道,3×3
 261,221,山道,3×3
 178,218,山道,3×3
@@ -148,8 +149,14 @@ const MARKS_SYM=`
 229,295,山,
 # 帯の左右をつなぐ山（x=270,y289〜295 から、右側の山の帯へ。画面で横にのびる）
 多角形 270,289 270,295 295,270 289,270 山
-267,309,拠点,5×5
+# 山城（左上の2か所。対称の位置にも置かれて、全部で8か所）
+267,309,山城,5×5
 267,330,山城,5×5
+# 山城の両脇（山の帯をはさむ3×11。中心から x は±3〜5、y は±5。すべての山城に同じ形で付く）
+262,304～264,314,山城
+270,304～272,314,山城
+262,325～264,335,山城
+270,325～272,335,山城
 `;
 
 (function applyMarks(){
@@ -177,7 +184,7 @@ const MARKS_SYM=`
   const x1=x-Math.floor((w-1)/2),y1=y-Math.floor((h-1)/2);
   const rects=[[x1,y1,x1+w-1,y1+h-1]];
   if(f[2]==='山道'&&w===3&&h===3)rects.push([x-4,y-4,x-1,y-1],[x+1,y+1,x+4,y+4]);
-  return{t,rects,name:f[2],center:[x,y]};
+  return{t,rects,name:f[2],center:[x,y],noArea:(f[4]||'').includes('エリアなし')};
  }
  const TF={
   id:(x,y)=>[x,y],
@@ -191,7 +198,7 @@ const MARKS_SYM=`
    const p=TF[tf](r[0],r[1]),q=TF[tf](r[2],r[3]);
    rect(Math.min(p[0],q[0]),Math.min(p[1],q[1]),Math.max(p[0],q[0]),Math.max(p[1],q[1]),sh.t);
   });
-  if(sh.center&&AREAS[sh.name]){ // エリアを持つ建物は、あとで攻撃判定に使うので記録しておく
+  if(sh.center&&AREAS[sh.name]&&!sh.noArea){ // エリアを持つ建物は、あとで攻撃判定に使うので記録しておく
    const c=TF[tf](sh.center[0],sh.center[1]),bx=c[0]-O,by=c[1]-O;
    if(!buildings.some(b=>b.name===sh.name&&b.x===bx&&b.y===by))buildings.push({name:sh.name,x:bx,y:by});
   }
@@ -306,7 +313,7 @@ function act(gx,gy,drag){
   if(drag)return;
   if(owner[i]>=0)forts.splice(owner[i],1);
   else if(TYPES[terrain[i]].build&&(forts.length===0||cm[i]))forts.push([gx,gy]);
- }else terrain[i]=mode==='erase'?0:+mode;
+ }
  rebuild();draw();
 }
 
@@ -362,20 +369,13 @@ function commitGhost(){
 // スマホのタップ：砦モードなら仮の砦を出す（砦の範囲内をタップすると解除）。ほかのモードはそのマスを塗る。
 function tapAt(gx,gy){
  if(!inMap(gx,gy))return;
- if(mode!=='fort'){act(gx,gy,false);return}
  const i=gy*N+gx;
  if(owner[i]>=0){forts.splice(owner[i],1);ghost=null;rebuild();draw();updateBar();return}
  const sp=snapOn?snap(gx,gy):[gx,gy];
  ghost={x:sp[0],y:sp[1]};drawGhost();updateBar();
 }
 
-// ボタンと凡例を TYPES から自動生成
-const tools=document.getElementById('tools');
-function addBtn(label,m,on){const b=document.createElement('button');b.textContent=label;b.dataset.m=m;if(on)b.className='on';
- b.onclick=()=>{mode=m;clearGhost();tools.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))};tools.appendChild(b)}
-addBtn('砦','fort',true);
-TYPES.forEach((t,i)=>{if(i)addBtn(t.name,String(i))});
-addBtn('平地に戻す','erase');
+// 凡例を TYPES から自動生成（同じ色の種類は1つにまとめる）
 const colorGroups=new Map();
 TYPES.forEach(t=>colorGroups.set(t.color,(colorGroups.get(t.color)||[]).concat(t.name)));
 const legendItems=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['攻撃エリア','#fbbf24'],['攻撃できるエリア','#ef4444'],['置ける場所','#86efac'],['ぴったり接続（11マス先）','#16a34a']]);
@@ -398,8 +398,7 @@ cv.addEventListener('pointermove',e=>{
  const[gx,gy]=cellOf(e);
  if(e.pointerType==='mouse'){
   document.getElementById('pos').textContent=inMap(gx,gy)?'x'+(gx+O)+' y'+(gy+O):'-';
-  if(down&&mode!=='fort')act(gx,gy,true);
-  else if(!down&&mode==='fort'){ghost=inMap(gx,gy)?{x:gx,y:gy}:null;drawGhost()}
+  if(!down){ghost=inMap(gx,gy)?{x:gx,y:gy}:null;drawGhost()}
   return;
  }
  if(!gs)return;
