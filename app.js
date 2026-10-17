@@ -355,7 +355,7 @@ function updateBar(){
  const ok=canPlace(ghost.x,ghost.y);
  let gain=0;
  if(ok)buildings.forEach((b,i)=>{if(!attack[i]&&reaches(ghost.x,ghost.y,b))gain++});
- ghostinfo.textContent='x'+(ghost.x+O)+' y'+(ghost.y+O)+'　'+(ok?'置けます（新たに攻撃できる建物 +'+gain+'）':reason(ghost.x,ghost.y));
+ ghostinfo.textContent=(ghost.x+O)+','+(ghost.y+O)+'　'+(ok?'置けます（新たに攻撃できる建物 +'+gain+'）':reason(ghost.x,ghost.y));
  ghostinfo.style.color=ok?'':'#c0392b';
  gplace.disabled=!ok;
  ghostbar.hidden=false;
@@ -397,7 +397,7 @@ cv.addEventListener('pointerdown',e=>{
 cv.addEventListener('pointermove',e=>{
  const[gx,gy]=cellOf(e);
  if(e.pointerType==='mouse'){
-  document.getElementById('pos').textContent=inMap(gx,gy)?'x'+(gx+O)+' y'+(gy+O):'-';
+  document.getElementById('pos').textContent=inMap(gx,gy)?(gx+O)+','+(gy+O):'-';
   if(!down){ghost=inMap(gx,gy)?{x:gx,y:gy}:null;drawGhost()}
   return;
  }
@@ -453,10 +453,11 @@ function setFortsFromGame(list){
  forts=(list||[]).filter(p=>Array.isArray(p)&&p.length===2&&Number.isInteger(p[0])&&Number.isInteger(p[1])&&inMap(p[0]-O,p[1]-O)).map(p=>[p[0]-O,p[1]-O]);
 }
 function persist(){lsSet(KEY_CUR,fortsToGame())}
-function codeOf(){return 'FORT1:'+fortsToGame().map(p=>p[0]+'.'+p[1]).join(';')}
+function codeOf(){return 'FORT1: '+fortsToGame().map(p=>p[0]+','+p[1]).join(' ')}
 function parseCode(text){
- if(!/FORT1:/.test(text))return null;
- return [...text.split('FORT1:')[1].matchAll(/(\d+)\.(\d+)/g)].map(m=>[+m[1],+m[2]]);
+ if(!/FORT1/.test(text))return null;
+ // 新しい形式（219,290 208,299 …）も、前の形式（219.290;208.299 …）も読める
+ return [...text.split('FORT1')[1].matchAll(/(\d+)\s*[,，.]\s*(\d+)/g)].map(m=>[+m[1],+m[2]]);
 }
 const pad2=n=>String(n).padStart(2,'0');
 function stampText(){const d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes())}
@@ -494,7 +495,7 @@ document.getElementById('codecopy').onclick=async e=>{
 };
 document.getElementById('codeload').onclick=()=>{
  const inp=document.getElementById('codein'),list=parseCode(inp.value);
- if(!list||!list.length){alert('コードが読み取れませんでした（FORT1: から始まるコードを貼ってください）');return}
+ if(!list||!list.length){alert('コードが読み取れませんでした（FORT1 から始まるコードを貼ってください）');return}
  if(loadLayout(list)){inp.value='';savesdlg.hidden=true}
 };
 
@@ -504,7 +505,7 @@ const shotdlg=document.getElementById('shot'),shotimg=document.getElementById('s
 const shotshare=document.getElementById('shotshare'),shotcopy=document.getElementById('shotcopy');
 let shotBlob=null,shotUrl=null;
 function shotName(){return 'fort-'+stampText().replace(/[^0-9]/g,'')+'.png'}
-function coordText(){return '砦配置（'+forts.length+'基）\n'+atkText()+'\n'+forts.map((f,i)=>(i+1)+': x'+(f[0]+O)+' y'+(f[1]+O)).join('\n')}
+function coordText(){return '砦配置（'+forts.length+'基）\n'+atkText()+'\n'+forts.map((f,i)=>(i+1)+': '+(f[0]+O)+','+(f[1]+O)).join('\n')}
 function makeShot(){
  const k=4,mw=2*N*k,mh=N*k,pad=24,head=132,W=mw+pad*2;
  const font='"Hiragino Sans","Yu Gothic",Meiryo,sans-serif';
