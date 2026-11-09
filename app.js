@@ -73,6 +73,8 @@ band(-U_IN,U_IN,V_BOT,V_BOT+BAND_V-1,1);   // 下の帯
 poly(SHALLOW_L,2);
 poly(SHALLOW_L.map(([x,y])=>[y,x]),2);
 
+const baseTerrain=new Uint8Array(N*N); // edits.js を当てる前の地形（編集モードで「どこを直したか」を調べるため）
+
 // ===== 攻撃できるエリア =====
 // 拠点・矢倉・療養所・抜け道には、まわりにエリアがあり、砦の範囲がそのエリアに隣接する（辺・角で接する、または重なる）と攻撃できる。
 // エリアは建物の中心を中心にした正方形で、値は一辺のマス数（奇数）。望楼・山城にはエリアがない。
@@ -133,6 +135,7 @@ x,y,地形,マス数
 146,242,平地,
 149,239,平地,
 150,239,平地,
+
 # 訂正（10/21）
 256,152,浅瀬
 179,210,平地
@@ -363,6 +366,9 @@ const MARKS_SYM=`
   }
   const sh=parse(line);if(sh)tfs.forEach(tf=>stamp(sh,tf));
  });
+ // 地形の手直し（edits.js）。いちばん最後に当てるので、ここに書いたものが優先される。
+ baseTerrain.set(terrain);
+ if(typeof EDITS!=='undefined')String(EDITS).split('\n').forEach(line=>{const sh=parse(line);if(sh)stamp(sh,'id')});
 })();
 // ----------------------------
 
@@ -519,6 +525,7 @@ function commitGhost(){
 // スマホのタップ：砦モードなら仮の砦を出す（砦の範囲内をタップすると解除）。ほかのモードはそのマスを塗る。
 function tapAt(gx,gy){
  if(!inMap(gx,gy))return;
+ if(EDIT){curStroke=[];paintCell(gx,gy);endStroke();return} // 編集モード：タップで1か所塗る
  const i=gy*N+gx;
  if(owner[i]>=0){forts.splice(owner[i],1);ghost=null;rebuild();draw();updateBar();return}
  const sp=snapOn?snap(gx,gy):[gx,gy];
@@ -538,7 +545,7 @@ document.getElementById('legend').innerHTML=legendItems.map(([n,c])=>'<span><i s
 let down=false,gs=null;
 cv.addEventListener('pointerdown',e=>{
  const[gx,gy]=cellOf(e);
- if(e.pointerType==='mouse'){down=true;touchUI=false;act(gx,gy,false);return}
+ if(e.pointerType==='mouse'){down=true;touchUI=false;if(EDIT){curStroke=[];paintCell(gx,gy)}else act(gx,gy,false);return}
  cv.setPointerCapture(e.pointerId);touchUI=true;
  gs={x0:e.clientX,y0:e.clientY,sl:wrap.scrollLeft,st:wrap.scrollTop,moved:false,
   onGhost:!!ghost&&mode==='fort'&&Math.abs(gx-ghost.x)<=H&&Math.abs(gy-ghost.y)<=H,
@@ -548,6 +555,7 @@ cv.addEventListener('pointermove',e=>{
  const[gx,gy]=cellOf(e);
  if(e.pointerType==='mouse'){
   document.getElementById('pos').textContent=inMap(gx,gy)?(gx+O)+','+(gy+O):'-';
+  if(EDIT){if(down&&curStroke)paintCell(gx,gy);return} // 編集モード：押したままなぞって塗る
   if(!down){ghost=inMap(gx,gy)?{x:gx,y:gy}:null;drawGhost()}
   return;
  }
@@ -563,6 +571,7 @@ cv.addEventListener('pointermove',e=>{
 });
 cv.addEventListener('pointerup',e=>{
  down=false;
+ if(EDIT&&e.pointerType==='mouse'){endStroke();return}
  if(e.pointerType==='mouse'||!gs)return;
  const t=gs;gs=null;
  if(t.moved)return;
@@ -571,7 +580,7 @@ cv.addEventListener('pointerup',e=>{
 });
 cv.addEventListener('pointercancel',()=>{gs=null;down=false});
 cv.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'&&mode==='fort'){ghost=null;drawGhost()}});
-window.addEventListener('pointerup',()=>down=false);
+window.addEventListener('pointerup',()=>{if(EDIT&&curStroke)endStroke();down=false});
 gplace.onclick=commitGhost;
 document.getElementById('gcancel').onclick=clearGhost;
 document.getElementById('snap').onchange=e=>{snapOn=e.target.checked};
@@ -718,6 +727,84 @@ document.getElementById('shotcoords').onclick=async e=>{
 };
 [shotdlg,savesdlg].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.hidden=true}));
 window.addEventListener('keydown',e=>{if(e.key==='Escape'){shotdlg.hidden=true;savesdlg.hidden=true}});
+
+// ===== 地形の手直し（URLの末尾に ?edit を付けて開いたときだけ使える）=====
+// 山・浅瀬・平地のマスを、マウスでなぞって塗る（建物・山道など、ほかの種類のマスは塗れない）。
+// 直した結果は「書き出し」で edits.js にでき、それをアップロードし直すと全員に反映される。
+// 編集中の内容は、このブラウザに自動で残る（「公開中の状態に戻す」で捨てられる）。
+const EDIT=typeof location!=='undefined'&&/[?&]edit(=|&|$)/.test(location.search);
+const KEY_EDIT='fortsim.v1.terrainedit';
+let brushType=1,brushSize=1,strokes=[],curStroke=null;
+const editbar=document.getElementById('editbar');
+function diffList(){ // edits.js を当てる前と違うマス
+ const L=[];
+ for(let i=0;i<N*N;i++)if(terrain[i]!==baseTerrain[i])L.push([i%N+O,Math.floor(i/N)+O,terrain[i]]);
+ return L;
+}
+function updateEditInfo(){document.getElementById('editinfo').textContent='変更 '+diffList().length+' マス'}
+function persistEdit(){if(EDIT)lsSet(KEY_EDIT,diffList())}
+function paintCell(gx,gy){ // なぞっている間は、変わったマスだけをその場で描く（軽くするため）
+ if(!inMap(gx,gy))return;
+ const r=Math.floor(brushSize/2);
+ ctx.setTransform(cs,-cs/2,-cs,-cs/2,cv.width/2,cv.height);
+ for(let y=gy-r;y<=gy+r;y++)for(let x=gx-r;x<=gx+r;x++){
+  if(!inMap(x,y))continue;
+  const i=y*N+x,t=terrain[i];
+  if(t>2||t===brushType)continue; // 平地(0)・山(1)・浅瀬(2)のマスだけ塗れる
+  if(curStroke)curStroke.push([i,t]);
+  terrain[i]=brushType;
+  ctx.fillStyle=TYPES[brushType].color;ctx.fillRect(x,y,1.05,1.05);
+ }
+}
+function endStroke(){ // 1回なぞり終わったら、全体を描き直して保存
+ if(!curStroke)return;
+ if(curStroke.length){strokes.push(curStroke);if(strokes.length>200)strokes.shift();persistEdit();rebuild();draw();updateEditInfo()}
+ curStroke=null;
+}
+function undoEdit(){
+ const st=strokes.pop();if(!st)return;
+ for(let k=st.length-1;k>=0;k--)terrain[st[k][0]]=st[k][1];
+ persistEdit();rebuild();draw();updateEditInfo();
+}
+function exportText(){
+ const lines=diffList().map(([x,y,t])=>x+','+y+','+TYPES[t].name+',');
+ return '// 地形の手直し（編集モードで作成）。この内容で edits.js を置き換えてアップロードすると、全員に反映される。\n// 1行 = x,y,地形,\nconst EDITS=`\nx,y,地形,\n'+lines.join('\n')+'\n`;\n';
+}
+if(EDIT){
+ editbar.hidden=false;
+ editbar.querySelectorAll('[data-brush]').forEach(b=>b.onclick=()=>{
+  brushType=+b.dataset.brush;
+  editbar.querySelectorAll('[data-brush]').forEach(x=>x.classList.toggle('on',x===b));
+ });
+ document.getElementById('brushsize').onchange=e=>{brushSize=+e.target.value};
+ document.getElementById('editundo').onclick=undoEdit;
+ document.getElementById('editreset').onclick=()=>{
+  if(!confirm('編集中の内容を捨てて、公開中の地形に戻しますか？'))return;
+  try{localStorage.removeItem(KEY_EDIT)}catch(e){}
+  location.reload();
+ };
+ const exportdlg=document.getElementById('export'),exporttext=document.getElementById('exporttext');
+ document.getElementById('editexport').onclick=()=>{exporttext.value=exportText();exportdlg.hidden=false};
+ document.getElementById('exportclose').onclick=()=>{exportdlg.hidden=true};
+ exportdlg.addEventListener('click',e=>{if(e.target===exportdlg)exportdlg.hidden=true});
+ document.getElementById('exportcopy').onclick=async e=>{
+  try{await navigator.clipboard.writeText(exporttext.value);flash(e.target,'コピーしました')}
+  catch(err){exporttext.select();flash(e.target,'選択しました。コピーしてください')}
+ };
+ document.getElementById('exportdl').onclick=()=>{
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([exporttext.value],{type:'text/javascript'}));
+  a.download='edits.js';document.body.appendChild(a);a.click();a.remove();
+ };
+ window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undoEdit()}});
+ // 前回の編集の続きから
+ const draft=lsGet(KEY_EDIT);
+ if(Array.isArray(draft)){
+  terrain.set(baseTerrain);
+  draft.forEach(([x,y,t])=>{if(inMap(x-O,y-O)&&TYPES[t])terrain[(y-O)*N+(x-O)]=t});
+ }
+ updateEditInfo();
+}
 
 // 前回の続きから始める
 setFortsFromGame(lsGet(KEY_CUR));

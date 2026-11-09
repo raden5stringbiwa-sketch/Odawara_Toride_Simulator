@@ -36,3 +36,6 @@ canvas{display:block}
 .dlg li{display:flex;gap:8px;align-items:center}
 .dlg li span{flex:1;word-break:break-all}
 .small{font-size:12px;opacity:.75;margin:0}
+.editbar{background:#fff3cd;color:#664d03;border-bottom:2px solid #d97706}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .editbar{background:#3a2e0a;color:#ffe69c}}
+.dlg textarea{width:100%;height:40vh;box-sizing:border-box;font:12px/1.4 monospace;background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:6px;padding:6px}
