@@ -23,7 +23,8 @@
 <button id="clear">砦を全解除</button>
 <button id="open-saves">保存・読み込み</button>
 <button id="open-shot">投稿用画像</button>
-<span class="stat">砦数: <span id="cnt">0</span> ／ 攻撃可: <span id="atk">0</span>/<span id="atkall">0</span> ／ <span id="pos">-</span></span>
+<button id="open-castles">主城</button>
+<span class="stat">砦数: <span id="cnt">0</span> ／ 攻撃可: <span id="atk">0</span>/<span id="atkall">0</span> ／ 主城: <span id="cst">0</span> ／ <span id="pos">-</span></span>
 </div>
 <div class="legend" id="legend"></div>
 <div id="mapbox">
@@ -45,6 +46,13 @@
 <div class="row"><button id="codecopy">いまの配置のコードをコピー</button></div>
 <div class="row"><input id="codein" placeholder="コードを貼り付け"><button id="codeload">読み込む</button></div>
 <div class="row"><button id="savesclose">閉じる</button></div>
+</div></div>
+<div id="castles" class="overlay" hidden><div class="dlg">
+<h2>主城の確認</h2>
+<p class="small">主城は2×2です。座標は、2×2のうち x・y が小さい側のマスとして、「4マスとも砦の範囲の中で、平地か浅瀬の上」に置けるかを確認しています。コードの「主城:」のあとに座標を書いても追加できます。</p>
+<ul id="castlelist"></ul>
+<div class="row"><input id="castlein" placeholder="主城の座標（例: 300,300 310,300）"><button id="castleadd">追加</button></div>
+<div class="row"><button id="castleclear">すべて削除</button><button id="castlesclose">閉じる</button></div>
 </div></div>
 <div id="export" class="overlay" hidden><div class="dlg">
 <h2>地形の書き出し</h2>
