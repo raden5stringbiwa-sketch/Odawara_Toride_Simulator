@@ -19,7 +19,7 @@ const TYPES=[
 ];
 
 const terrain=new Uint8Array(N*N),owner=new Int16Array(N*N).fill(-1),cm=new Uint8Array(N*N);
-let forts=[],castles=[],castleCheck=[],cs=3,mode='fort',aligned=[];
+let forts=[],cs=3,mode='fort',aligned=[];
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap');
 const ov=document.getElementById('ov'),octx=ov.getContext('2d'); // 置く前の仮の砦を描く上の層（軽く動かすため別にしている）
 let ghost=null,snapT=[],snapOn=true,touchUI=false,showArea=true,attack=[];
@@ -114,6 +114,178 @@ x,y,地形,マス数
 261,221,山道,3×3
 178,218,山道,3×3
 218,178,山道,3×3
+198,289,浅瀬,
+198,290,浅瀬,
+200,288,山,
+193,295,浅瀬,
+192,295,浅瀬,
+195,294,浅瀬,
+191,294,浅瀬,
+186,290,浅瀬,
+188,293,浅瀬,
+144,245,浅瀬,
+151,239,山,
+156,245,山,
+153,245,山,
+144,246,浅瀬,
+143,246,浅瀬,
+144,244,浅瀬,
+145,243,平地,
+147,241,平地,
+146,242,平地,
+149,239,平地,
+150,239,平地,
+
+# 訂正（10/21）
+256,152,浅瀬
+179,210,平地
+178,211,平地
+178,212,平地
+173,216,平地
+172,217,平地
+173,217,平地
+171,218,平地
+172,218,平地
+170,219,平地
+171,219,平地
+172,219,平地
+169,220,平地
+170,220,平地
+171,220,平地
+168,221,平地
+169,221,平地
+170,221,平地
+166,223,平地
+179,223,平地
+165,224,平地
+166,224,平地
+164,225,平地
+165,225,平地
+163,226,平地
+162,227,平地
+161,228,平地
+162,228,平地
+175,228,平地
+160,229,平地
+174,229,平地
+173,230,平地
+158,231,平地
+157,232,平地
+156,233,平地
+157,233,平地
+156,234,平地
+154,235,平地
+153,236,平地
+154,236,平地
+151,238,平地
+168,272,浅瀬
+168,273,浅瀬
+169,272,浅瀬
+169,273,浅瀬
+170,273,浅瀬
+186,289,浅瀬
+187,290,浅瀬
+188,291,浅瀬
+188,292,浅瀬
+189,292,浅瀬
+189,293,浅瀬
+190,293,浅瀬
+253,149,浅瀬
+254,149,浅瀬
+255,149,浅瀬
+256,149,浅瀬
+254,150,浅瀬
+255,150,浅瀬
+256,150,浅瀬
+255,151,浅瀬
+256,151,浅瀬
+233,156,平地
+230,158,山
+229,160,平地
+229,161,平地
+227,162,平地
+224,165,平地
+221,167,山
+220,169,平地
+219,170,平地
+218,171,平地
+218,172,平地
+218,173,平地
+148,240,浅瀬
+144,244,平地
+146,250,浅瀬
+147,251,浅瀬
+148,252,浅瀬
+189,200,平地
+188,201,平地
+189,201,平地
+188,202,平地
+189,202,平地
+186,203,平地
+185,204,平地
+184,205,平地
+181,208,平地
+180,209,平地
+181,209,平地
+180,210,平地
+177,212,平地
+176,213,平地
+177,213,平地
+217,172,平地
+216,173,平地
+217,173,平地
+153,244,山
+154,245,山
+# 訂正（11/4）
+272,166,浅瀬
+272,167,浅瀬
+272,168,浅瀬
+272,169,浅瀬
+273,169,浅瀬
+274,169,浅瀬
+273,170,浅瀬
+274,170,浅瀬
+274,171,浅瀬
+276,169,浅瀬
+276,170,浅瀬
+276,171,浅瀬
+276,172,浅瀬
+276,173,浅瀬
+275,169,浅瀬
+275,170,浅瀬
+275,171,浅瀬
+275,172,浅瀬
+271,166,浅瀬
+271,167,浅瀬
+270,166,浅瀬
+285,180,浅瀬
+285,181,浅瀬
+285,182,浅瀬
+284,180,浅瀬
+284,181,浅瀬
+283,177,浅瀬
+283,178,浅瀬
+283,179,浅瀬
+283,180,浅瀬
+282,177,浅瀬
+282,178,浅瀬
+282,179,浅瀬
+281,174,浅瀬
+281,175,浅瀬
+281,176,浅瀬
+281,177,浅瀬
+281,178,浅瀬
+280,174,浅瀬
+280,175,浅瀬
+280,176,浅瀬
+280,177,浅瀬
+280,178,浅瀬
+279,174,浅瀬
+279,175,浅瀬
+279,176,浅瀬
+278,174,浅瀬
+278,175,浅瀬
+277,174,浅瀬
 `;
 
 // ===== 対称に置くもの =====
@@ -232,10 +404,6 @@ function rebuild(){
  attack=buildings.map(b=>forts.some(f=>reaches(f[0],f[1],b)));
  document.getElementById('atk').textContent=attack.filter(Boolean).length;
  document.getElementById('atkall').textContent=buildings.length;
- // 主城（2×2）：置けるかを確認
- castleCheck=castles.map((c,i)=>checkCastle(c,i));
- const ngc=castleCheck.filter(Boolean).length;
- document.getElementById('cst').textContent=castles.length?castles.length+(ngc?'（置けない '+ngc+'）':''):'0';
  document.getElementById('cnt').textContent=forts.length;
  persist();
 }
@@ -267,13 +435,6 @@ function paintMap(c,W,Hh,k,opt){
  forts.forEach(f=>c.strokeRect(f[0]-H,f[1]-H,S,S));
  c.fillStyle='#1e3a8a';c.strokeStyle='#fff';c.lineWidth=.15;
  forts.forEach(f=>{c.fillRect(f[0],f[1],1,1);c.strokeRect(f[0],f[1],1,1)});
- castles.forEach((cc,i)=>{ // 主城（2×2）。置けないものは薄く点線
-  const bad=castleCheck[i];
-  c.fillStyle=bad?'rgba(190,18,60,.35)':'#be123c';c.fillRect(cc[0],cc[1],CASTLE,CASTLE);
-  c.strokeStyle=bad?'#dc2626':'#ffffff';c.lineWidth=bad?.3:.2;
-  if(bad)c.setLineDash([.4,.3]);
-  c.strokeRect(cc[0],cc[1],CASTLE,CASTLE);c.setLineDash([]);
- });
  c.strokeStyle='rgba(0,0,0,.18)';c.lineWidth=.08;c.beginPath();
  for(let g=0;g<=N;g+=20){c.moveTo(g,0);c.lineTo(g,N);c.moveTo(0,g);c.lineTo(N,g)}
  c.stroke();
@@ -285,16 +446,6 @@ function paintMap(c,W,Hh,k,opt){
    const sx=(f[0]-f[1])*k+W/2,sy=Hh-(f[0]+f[1]+1)*k/2;
    c.lineWidth=Math.max(3,fs/4);c.strokeStyle='#fff';c.strokeText(String(n+1),sx,sy);
    c.fillStyle='#1e3a8a';c.fillText(String(n+1),sx,sy);
-  });
- }
- if(castles.length&&(opt.numbers||k>=6)){ // 主城の名前（投稿用画像と、拡大したとき）
-  c.setTransform(1,0,0,1,0,0);
-  const fs2=Math.max(11,Math.round(k*2.6));
-  c.font='bold '+fs2+'px sans-serif';c.textAlign='center';c.textBaseline='middle';c.lineJoin='round';
-  castles.forEach((cc,n)=>{
-   const sx=(cc[0]-cc[1])*k+W/2,sy=Hh-(cc[0]+cc[1]+2)*k/2; // 2×2の中心
-   c.lineWidth=Math.max(3,fs2/4);c.strokeStyle='#fff';c.strokeText('主'+(n+1),sx,sy);
-   c.fillStyle='#9f1239';c.fillText('主'+(n+1),sx,sy);
   });
  }
 }
@@ -384,7 +535,7 @@ function tapAt(gx,gy){
 // 凡例を TYPES から自動生成（同じ色の種類は1つにまとめる）
 const colorGroups=new Map();
 TYPES.forEach(t=>colorGroups.set(t.color,(colorGroups.get(t.color)||[]).concat(t.name)));
-const legendItems=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['攻撃エリア','#fbbf24'],['攻撃できるエリア','#ef4444'],['主城（2×2）','#be123c'],['置ける場所','#86efac'],['ぴったり接続（11マス先）','#16a34a']]);
+const legendItems=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['攻撃エリア','#fbbf24'],['攻撃できるエリア','#ef4444'],['置ける場所','#86efac'],['ぴったり接続（11マス先）','#16a34a']]);
 document.getElementById('legend').innerHTML=legendItems.map(([n,c])=>'<span><i style="background:'+c+'"></i>'+n+'</span>').join('');
 
 // ===== 操作 =====
@@ -449,61 +600,10 @@ function setZoom(v){
 document.getElementById('zoom').onchange=e=>setZoom(e.target.value);
 window.addEventListener('resize',()=>{if(zoomMode==='fit')setZoom('fit')});
 document.getElementById('clear').onclick=()=>{if(forts.length&&!confirm('すべての砦を解除しますか？'))return;forts=[];ghost=null;rebuild();draw();updateBar()};
-// ===== 主城（2×2）=====
-// コードの「主城:」のあとに書いた座標に、主城（2×2）を置いて、本当に置けるかを確認する。
-// 座標(x,y)は、2×2のうち x・y が小さい側のマス（x〜x+1、y〜y+1 を占める）として扱う。
-// 置ける条件：4マスとも平地か浅瀬の上／4マスとも砦の範囲の中（CASTLE_NEEDS_TERRITORY）／ほかの主城と重ならない。
-const CASTLE=2,CASTLE_NEEDS_TERRITORY=true;
-function castlesToGame(){return castles.map(c=>[c[0]+O,c[1]+O])}
-function setCastlesFromGame(list){
- castles=(list||[]).filter(p=>Array.isArray(p)&&p.length===2&&Number.isInteger(p[0])&&Number.isInteger(p[1])&&inMap(p[0]-O,p[1]-O)).map(p=>[p[0]-O,p[1]-O]);
-}
-function checkCastle(c,idx){ // 置けるなら ''、置けないなら理由
- const cells=[];
- for(let dy=0;dy<CASTLE;dy++)for(let dx=0;dx<CASTLE;dx++)cells.push([c[0]+dx,c[1]+dy]);
- for(const [x,y] of cells){
-  if(!inMap(x,y))return 'マップの外です';
-  const t=terrain[y*N+x];
-  if(!TYPES[t].build)return TYPES[t].name+'には置けません';
- }
- if(CASTLE_NEEDS_TERRITORY&&cells.some(([x,y])=>owner[y*N+x]<0))return '砦の範囲の外にはみ出します';
- for(let j=0;j<castles.length;j++){
-  if(j===idx)continue;
-  if(Math.abs(castles[j][0]-c[0])<CASTLE&&Math.abs(castles[j][1]-c[1])<CASTLE)return '他の主城と重なります';
- }
- return '';
-}
-const castlesdlg=document.getElementById('castles'),castlelist=document.getElementById('castlelist');
-function renderCastles(){
- castlelist.textContent='';
- if(!castles.length){const li=document.createElement('li');li.textContent='主城はありません。コードの「主城:」のあとに座標を書くか、下の欄から追加できます。';castlelist.appendChild(li)}
- castles.forEach((c,i)=>{
-  const li=document.createElement('li'),sp=document.createElement('span');
-  sp.textContent='主城'+(i+1)+'　'+(c[0]+O)+','+(c[1]+O)+'　'+(castleCheck[i]?'✖ '+castleCheck[i]:'○ 置けます');
-  if(castleCheck[i])sp.style.color='#c0392b';
-  const b=document.createElement('button');b.textContent='削除';
-  b.onclick=()=>{castles.splice(i,1);rebuild();draw();renderCastles()};
-  li.append(sp,b);castlelist.appendChild(li);
- });
-}
-document.getElementById('open-castles').onclick=()=>{renderCastles();castlesdlg.hidden=false};
-document.getElementById('castlesclose').onclick=()=>{castlesdlg.hidden=true};
-castlesdlg.addEventListener('click',e=>{if(e.target===castlesdlg)castlesdlg.hidden=true});
-document.getElementById('castleadd').onclick=()=>{
- const inp=document.getElementById('castlein');
- const list=[...inp.value.matchAll(/(\d+)\s*[,，.]\s*(\d+)/g)].map(m=>[+m[1]-O,+m[2]-O]).filter(p=>inMap(p[0],p[1]));
- if(!list.length){alert('座標が読み取れませんでした（例: 300,300）');return}
- list.forEach(p=>castles.push(p));inp.value='';rebuild();draw();renderCastles();
-};
-document.getElementById('castleclear').onclick=()=>{
- if(castles.length&&!confirm('主城をすべて削除しますか？'))return;
- castles=[];rebuild();draw();renderCastles();
-};
-
 // ===== 保存 =====
 // 置いた砦は、変えるたびにこのブラウザへ自動で保存され、次に開いたとき続きから始まる。
 // 「保存・読み込み」では名前をつけて残せる。コードをコピーすれば、同盟員に配置を渡せる。
-// 保存するのは砦と主城の座標（ゲームの座標）だけ。地形は app.js のデータから作られる。
+// 保存するのは砦の座標（ゲームの座標）だけ。地形は app.js のデータから作られる。
 const KEY_CUR='fortsim.v1.current',KEY_SAVES='fortsim.v1.saves';
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
@@ -511,23 +611,19 @@ function fortsToGame(){return forts.map(f=>[f[0]+O,f[1]+O])}
 function setFortsFromGame(list){
  forts=(list||[]).filter(p=>Array.isArray(p)&&p.length===2&&Number.isInteger(p[0])&&Number.isInteger(p[1])&&inMap(p[0]-O,p[1]-O)).map(p=>[p[0]-O,p[1]-O]);
 }
-function persist(){lsSet(KEY_CUR,{forts:fortsToGame(),castles:castlesToGame()})}
-function codeOf(){
- return 'FORT1: '+fortsToGame().map(p=>p[0]+','+p[1]).join(' ')+(castles.length?' 主城: '+castlesToGame().map(p=>p[0]+','+p[1]).join(' '):'');
-}
-function parseCode(text){ // → {forts:[[x,y]…], castles:[[x,y]…]}。「主城」より前が砦、あとが主城
+function persist(){lsSet(KEY_CUR,fortsToGame())}
+function codeOf(){return 'FORT1: '+fortsToGame().map(p=>p[0]+','+p[1]).join(' ')}
+function parseCode(text){
  if(!/FORT1/.test(text))return null;
- const pairs=t=>[...t.matchAll(/(\d+)\s*[,，.]\s*(\d+)/g)].map(m=>[+m[1],+m[2]]);
- const parts=text.split('FORT1')[1].split(/主城/);
  // 新しい形式（219,290 208,299 …）も、前の形式（219.290;208.299 …）も読める
- return {forts:pairs(parts[0]),castles:pairs(parts.slice(1).join(' '))};
+ return [...text.split('FORT1')[1].matchAll(/(\d+)\s*[,，.]\s*(\d+)/g)].map(m=>[+m[1],+m[2]]);
 }
 const pad2=n=>String(n).padStart(2,'0');
 function stampText(){const d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes())}
 function flash(btn,msg){const t=btn.textContent;btn.textContent=msg;setTimeout(()=>{btn.textContent=t},1500)}
-function loadLayout(list,clist){
- if((forts.length||castles.length)&&!confirm('いまの配置は置き換えられます。読み込みますか？'))return false;
- setFortsFromGame(list);setCastlesFromGame(clist||[]);ghost=null;rebuild();draw();updateBar();return true;
+function loadLayout(list){
+ if(forts.length&&!confirm('いまの配置は置き換えられます。読み込みますか？'))return false;
+ setFortsFromGame(list);ghost=null;rebuild();draw();updateBar();return true;
 }
 const savesdlg=document.getElementById('saves'),savelist=document.getElementById('savelist');
 function renderSaves(){
@@ -536,9 +632,9 @@ function renderSaves(){
  if(!arr.length){const li=document.createElement('li');li.textContent='保存した配置はまだありません';savelist.appendChild(li)}
  arr.forEach((it,idx)=>{
   const li=document.createElement('li'),sp=document.createElement('span');
-  sp.textContent=it.name+'（'+it.forts.length+'基'+(it.castles&&it.castles.length?'・主城'+it.castles.length:'')+'）';
+  sp.textContent=it.name+'（'+it.forts.length+'基）';
   const b1=document.createElement('button');b1.textContent='読み込む';
-  b1.onclick=()=>{if(loadLayout(it.forts,it.castles))savesdlg.hidden=true};
+  b1.onclick=()=>{if(loadLayout(it.forts))savesdlg.hidden=true};
   const b2=document.createElement('button');b2.textContent='削除';
   b2.onclick=()=>{if(!confirm('「'+it.name+'」を削除しますか？'))return;arr.splice(idx,1);lsSet(KEY_SAVES,arr);renderSaves()};
   li.append(sp,b1,b2);savelist.appendChild(li);
@@ -548,7 +644,7 @@ document.getElementById('open-saves').onclick=()=>{renderSaves();savesdlg.hidden
 document.getElementById('savesclose').onclick=()=>{savesdlg.hidden=true};
 document.getElementById('savedo').onclick=()=>{
  const inp=document.getElementById('savename'),arr=lsGet(KEY_SAVES)||[];
- arr.push({name:inp.value.trim()||('配置 '+stampText()),t:Date.now(),forts:fortsToGame(),castles:castlesToGame()});
+ arr.push({name:inp.value.trim()||('配置 '+stampText()),t:Date.now(),forts:fortsToGame()});
  if(!lsSet(KEY_SAVES,arr)){alert('保存できませんでした（ブラウザの保存が使えない状態です）');return}
  inp.value='';renderSaves();
 };
@@ -557,9 +653,9 @@ document.getElementById('codecopy').onclick=async e=>{
  catch(err){prompt('コピーして使ってください',codeOf())}
 };
 document.getElementById('codeload').onclick=()=>{
- const inp=document.getElementById('codein'),cd=parseCode(inp.value);
- if(!cd||(!cd.forts.length&&!cd.castles.length)){alert('コードが読み取れませんでした（FORT1 から始まるコードを貼ってください）');return}
- if(loadLayout(cd.forts,cd.castles)){inp.value='';savesdlg.hidden=true}
+ const inp=document.getElementById('codein'),list=parseCode(inp.value);
+ if(!list||!list.length){alert('コードが読み取れませんでした（FORT1 から始まるコードを貼ってください）');return}
+ if(loadLayout(list)){inp.value='';savesdlg.hidden=true}
 };
 
 // ===== 投稿用画像（Discordなどに貼る用）=====
@@ -568,14 +664,11 @@ const shotdlg=document.getElementById('shot'),shotimg=document.getElementById('s
 const shotshare=document.getElementById('shotshare'),shotcopy=document.getElementById('shotcopy');
 let shotBlob=null,shotUrl=null;
 function shotName(){return 'fort-'+stampText().replace(/[^0-9]/g,'')+'.png'}
-function coordText(){
- return '砦配置（'+forts.length+'基）\n'+atkText()+'\n'+forts.map((f,i)=>(i+1)+': '+(f[0]+O)+','+(f[1]+O)).join('\n')
-  +(castles.length?'\n主城（'+castles.length+'基）\n'+castles.map((c,i)=>(i+1)+': '+(c[0]+O)+','+(c[1]+O)+(castleCheck[i]?'（置けません：'+castleCheck[i]+'）':'')).join('\n'):'');
-}
+function coordText(){return '砦配置（'+forts.length+'基）\n'+atkText()+'\n'+forts.map((f,i)=>(i+1)+': '+(f[0]+O)+','+(f[1]+O)).join('\n')}
 function makeShot(){
  const k=4,mw=2*N*k,mh=N*k,pad=24,head=132,W=mw+pad*2;
  const font='"Hiragino Sans","Yu Gothic",Meiryo,sans-serif';
- const items=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['攻撃エリア','#fbbf24'],['攻撃できるエリア','#ef4444'],['主城（2×2）','#be123c']]);
+ const items=[...colorGroups].map(([c,names])=>[names.join('・'),c]).concat([['砦の範囲','#4f7cf0'],['砦（中央）','#1e3a8a'],['攻撃エリア','#fbbf24'],['攻撃できるエリア','#ef4444']]);
  // 凡例を折り返して並べる
  const m=document.createElement('canvas').getContext('2d');m.font='22px '+font;
  const rows=[[]];let rx=0;
@@ -589,7 +682,7 @@ function makeShot(){
  g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);
  g.textBaseline='middle';g.textAlign='left';
  g.fillStyle='#1f2933';g.font='bold 40px '+font;g.fillText('砦配置シミュレーション',pad,46);
- g.fillStyle='#52606d';g.font='24px '+font;g.fillText('砦 '+forts.length+' 基'+(castles.length?'　主城 '+castles.length+' 基'+(castleCheck.some(Boolean)?'（置けない '+castleCheck.filter(Boolean).length+'）':''):'')+'　'+stampText(),pad,80);
+ g.fillStyle='#52606d';g.font='24px '+font;g.fillText('砦 '+forts.length+' 基　'+stampText(),pad,80);
  g.fillText(atkText(),pad,114);
  const mc=document.createElement('canvas');mc.width=mw;mc.height=mh;
  const mg=mc.getContext('2d');mg.fillStyle='#e6e8e4';mg.fillRect(0,0,mw,mh);
@@ -714,8 +807,6 @@ if(EDIT){
 }
 
 // 前回の続きから始める
-const savedCur=lsGet(KEY_CUR);
-if(Array.isArray(savedCur))setFortsFromGame(savedCur); // 前の形式（砦の座標だけ）
-else if(savedCur){setFortsFromGame(savedCur.forts);setCastlesFromGame(savedCur.castles)}
+setFortsFromGame(lsGet(KEY_CUR));
 rebuild();draw();
 wrap.scrollLeft=(cv.width-wrap.clientWidth)/2;
