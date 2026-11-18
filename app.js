@@ -459,7 +459,7 @@ function paintMap(c,W,Hh,k,opt){
    c.fillStyle='#1e3a8a';c.fillText(String(n+1),sx,sy);
   });
  }
- if(castles.length&&(opt.numbers||k>=11)){ // 主城の名前（投稿用画像と、拡大したとき）
+ /*if(castles.length&&(opt.numbers||k>=11)){ // 主城の名前（投稿用画像と、拡大したとき）
   c.setTransform(1,0,0,1,0,0);
   const fs2=Math.max(11,Math.round(k*2.6));
   c.font='bold '+fs2+'px sans-serif';c.textAlign='center';c.textBaseline='middle';c.lineJoin='round';
@@ -469,6 +469,7 @@ function paintMap(c,W,Hh,k,opt){
    c.fillStyle='#9f1239';c.fillText('主'+(n+1),sx,sy);
   });
  }
+*/
 }
 
 function draw(){
