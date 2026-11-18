@@ -24,6 +24,7 @@
 <button id="open-saves">保存・読み込み</button>
 <button id="open-shot">投稿用画像</button>
 <button id="open-castles">主城</button>
+<button id="open-cmd">コマンド</button>
 <span class="stat">砦数: <span id="cnt">0</span> ／ 攻撃可: <span id="atk">0</span>/<span id="atkall">0</span> ／ 主城: <span id="cst">0</span> ／ <span id="pos">-</span></span>
 </div>
 <div class="legend" id="legend"></div>
@@ -47,9 +48,16 @@
 <div class="row"><input id="codein" placeholder="コードを貼り付け"><button id="codeload">読み込む</button></div>
 <div class="row"><button id="savesclose">閉じる</button></div>
 </div></div>
+<div id="cmd" class="overlay" hidden><div class="dlg">
+<h2>コマンドで置く</h2>
+<p class="small">「砦:300,300 城:310,310」のように書いて「置く」を押すと、いまの配置に追加で置きます。砦は、砦のルール（置ける地形・既存の範囲に隣接・範囲が重ならない）で確認しながら、書いた順に置き、置けないものは理由を出します。城は2×2の主城で、どこにでも置けます。</p>
+<textarea id="cmdtext" placeholder="砦:300,300 砦:311,300 城:310,310"></textarea>
+<div class="row"><button id="cmdrun">置く</button><button id="cmdcopy">いまの配置をコマンドでコピー</button><button id="cmdclose">閉じる</button></div>
+<pre id="cmdresult" class="small"></pre>
+</div></div>
 <div id="castles" class="overlay" hidden><div class="dlg">
 <h2>主城の確認</h2>
-<p class="small">主城は2×2です。座標は、2×2のうち x・y が小さい側のマスとして、「4マスとも砦の範囲の中で、平地か浅瀬の上」に置けるかを確認しています。コードの「主城:」のあとに座標を書いても追加できます。</p>
+<p class="small">主城は2×2で、地形にも砦の範囲にも関係なく、どこにでも置けます。座標は、2×2のうち x・y が小さい側のマスです。マップの外にはみ出す場合と、ほかの主城と重なる場合だけ「置けない」と表示します。</p>
 <ul id="castlelist"></ul>
 <div class="row"><input id="castlein" placeholder="主城の座標（例: 300,300 310,300）"><button id="castleadd">追加</button></div>
 <div class="row"><button id="castleclear">すべて削除</button><button id="castlesclose">閉じる</button></div>

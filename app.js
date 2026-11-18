@@ -287,6 +287,7 @@ x,y,地形,マス数
 277,174,浅瀬
 `;
 
+
 // ===== 対称に置くもの =====
 // 「@左右」「@上下」「@左右上下」の行から、次の @ の行までに書いたものは、対称な位置にも自動で置かれる。
 //   左右＝x と y を入れ替えた位置（画面で左右に折り返し）／上下＝画面で上下に折り返した位置。
@@ -621,23 +622,15 @@ document.getElementById('zoom').onchange=e=>setZoom(e.target.value);
 window.addEventListener('resize',()=>{if(zoomMode==='fit')setZoom('fit')});
 document.getElementById('clear').onclick=()=>{if(forts.length&&!confirm('すべての砦を解除しますか？'))return;forts=[];ghost=null;rebuild();draw();updateBar()};
 // ===== 主城（2×2）=====
-// コードの「主城:」のあとに書いた座標に、主城（2×2）を置いて、本当に置けるかを確認する。
-// 座標(x,y)は、2×2のうち x・y が小さい側のマス（x〜x+1、y〜y+1 を占める）として扱う。
-// 置ける条件：4マスとも平地か浅瀬の上／4マスとも砦の範囲の中（CASTLE_NEEDS_TERRITORY）／ほかの主城と重ならない。
-const CASTLE=2,CASTLE_NEEDS_TERRITORY=true;
+// 主城は、地形にも砦の範囲にも関係なく、どこにでも置ける。座標(x,y)は、2×2のうち x・y が小さい側のマス（x〜x+1、y〜y+1 を占める）。
+// 「置けない」と表示するのは、マップの外にはみ出すときと、ほかの主城と重なるときだけ。
+const CASTLE=2;
 function castlesToGame(){return castles.map(c=>[c[0]+O,c[1]+O])}
 function setCastlesFromGame(list){
  castles=(list||[]).filter(p=>Array.isArray(p)&&p.length===2&&Number.isInteger(p[0])&&Number.isInteger(p[1])&&inMap(p[0]-O,p[1]-O)).map(p=>[p[0]-O,p[1]-O]);
 }
 function checkCastle(c,idx){ // 置けるなら ''、置けないなら理由
- const cells=[];
- for(let dy=0;dy<CASTLE;dy++)for(let dx=0;dx<CASTLE;dx++)cells.push([c[0]+dx,c[1]+dy]);
- for(const [x,y] of cells){
-  if(!inMap(x,y))return 'マップの外です';
-  const t=terrain[y*N+x];
-  if(!TYPES[t].build)return TYPES[t].name+'には置けません';
- }
- if(CASTLE_NEEDS_TERRITORY&&cells.some(([x,y])=>owner[y*N+x]<0))return '砦の範囲の外にはみ出します';
+ for(let dy=0;dy<CASTLE;dy++)for(let dx=0;dx<CASTLE;dx++)if(!inMap(c[0]+dx,c[1]+dy))return 'マップの外にはみ出します';
  for(let j=0;j<castles.length;j++){
   if(j===idx)continue;
   if(Math.abs(castles[j][0]-c[0])<CASTLE&&Math.abs(castles[j][1]-c[1])<CASTLE)return '他の主城と重なります';
@@ -670,6 +663,51 @@ document.getElementById('castleclear').onclick=()=>{
  if(castles.length&&!confirm('主城をすべて削除しますか？'))return;
  castles=[];rebuild();draw();renderCastles();
 };
+
+// ===== コマンドで置く =====
+// 「砦:300,300 城:310,310」のように書くと、砦と主城（城）を置ける。
+//   ・区切りは、空白・改行・全角の「：」「，」でもよい。「砦:300,300 301,310」のように、1つの名前のあとに座標を並べてもよい。
+//   ・砦は、砦のルール（置ける地形・既存の範囲に隣接・範囲が重ならない）で確認しながら、書いた順に置く。置けないものは理由を出す。
+//   ・城（主城）は2×2で、どこにでも置ける。
+function parseCommands(text){
+ const parts=text.split(/(主城|砦|城)/),res=[];
+ for(let i=1;i<parts.length;i+=2){
+  const kind=parts[i]==='砦'?'fort':'castle';
+  [...parts[i+1].matchAll(/(\d+)\s*[,，]\s*(\d+)/g)].forEach(m=>res.push({kind,x:+m[1],y:+m[2]}));
+ }
+ return res;
+}
+function runCommands(text){
+ const cmds=parseCommands(text),msgs=[];let nf=0,nc=0;
+ cmds.forEach(c=>{
+  const gx=c.x-O,gy=c.y-O,label=(c.kind==='fort'?'砦:':'城:')+c.x+','+c.y;
+  if(!inMap(gx,gy)){msgs.push(label+' → マップの外です');return}
+  if(c.kind==='fort'){
+   if(canPlace(gx,gy)){forts.push([gx,gy]);rebuild();nf++}
+   else msgs.push(label+' → 置けません（'+reason(gx,gy)+'）');
+  }else{castles.push([gx,gy]);nc++}
+ });
+ rebuild();draw();updateBar();
+ return{total:cmds.length,nf,nc,msgs};
+}
+function cmdOf(){ // いまの配置を、コマンドの形に（砦は置いた順）
+ return fortsToGame().map(p=>'砦:'+p[0]+','+p[1]).concat(castlesToGame().map(p=>'城:'+p[0]+','+p[1])).join(' ');
+}
+const cmddlg=document.getElementById('cmd'),cmdtext=document.getElementById('cmdtext'),cmdresult=document.getElementById('cmdresult');
+document.getElementById('open-cmd').onclick=()=>{cmdresult.textContent='';cmddlg.hidden=false};
+document.getElementById('cmdclose').onclick=()=>{cmddlg.hidden=true};
+cmddlg.addEventListener('click',e=>{if(e.target===cmddlg)cmddlg.hidden=true});
+document.getElementById('cmdrun').onclick=()=>{
+ const r=runCommands(cmdtext.value);
+ if(!r.total){cmdresult.textContent='座標が読み取れませんでした。「砦:300,300 城:310,310」のように書いてください。';return}
+ cmdresult.textContent='砦 '+r.nf+'基、城 '+r.nc+'基を置きました。'+(r.msgs.length?'\n置けなかったもの（'+r.msgs.length+'）:\n'+r.msgs.join('\n'):'');
+ if(!r.msgs.length){cmdtext.value='';cmddlg.hidden=true}
+};
+document.getElementById('cmdcopy').onclick=async e=>{
+ try{await navigator.clipboard.writeText(cmdOf());flash(e.target,'コピーしました')}
+ catch(err){prompt('コピーして使ってください',cmdOf())}
+};
+window.addEventListener('keydown',e=>{if(e.key==='Escape')cmddlg.hidden=true});
 
 // ===== 保存 =====
 // 置いた砦は、変えるたびにこのブラウザへ自動で保存され、次に開いたとき続きから始まる。
