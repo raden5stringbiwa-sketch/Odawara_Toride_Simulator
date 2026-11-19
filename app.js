@@ -632,6 +632,10 @@ function setCastlesFromGame(list){
 }
 function checkCastle(c,idx){ // 置けるなら ''、置けないなら理由
  for(let dy=0;dy<CASTLE;dy++)for(let dx=0;dx<CASTLE;dx++)if(!inMap(c[0]+dx,c[1]+dy))return 'マップの外にはみ出します';
+ for(let dy=0;dy<CASTLE;dy++)for(let dx=0;dx<CASTLE;dx++){
+ const t=terrain[(c[1]+dy)*N+(c[0]+dx)];
+ if(t===1||t===2)return '山・浅瀬に重なっています';
+ }
  for(let j=0;j<castles.length;j++){
   if(j===idx)continue;
   if(Math.abs(castles[j][0]-c[0])<CASTLE&&Math.abs(castles[j][1]-c[1])<CASTLE)return '他の主城と重なります';
